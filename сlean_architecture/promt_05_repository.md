@@ -1,49 +1,45 @@
 # Этап 5: Создание репозитория (Repositories.Ef/Api/)
 
-### Внимание
-
-- база данных может состоять из таблиц которые имеют следующие связи:
-  - без связей (например, Quote ; RepositoryQuote)
-  - один-ко-одному (One-to-One, нет примера в проекте)
-  - один-ко-многим (One-to-Many, например, UsefulLinkType → UsefulLink ; RepositoryUsefulLinkType ↔ RepositoryUsefulLink 
-  - много-ко-многим (Many-to-Many, например, Books ↔ Tags ; RepositoryBook ↔ RepositoryTag)
-  - самореферентные связи (Self-Referencing, например, Topic → Topic ; RepositoryTopic)
 
 ### Требования
 
 #### Общие требования для всех типов связей:
-- Название класса: `EntityNameQueryOptions` и `EntityNameCommandOptions` (если нужны)
+- Название классов опций: `EntityNameQueryOptions` и `EntityNameCommandOptions` (если нужны)
 - Интерфейс и реализация репозитория должны находиться в одном файле
-- Использовать `IDbContextFactory<DbContextBlog>` для создания контекста
-- Все методы асинхронные
+- Репозиторий получает `DbContextBlog` через DI (Scoped)
+- Репозитории НЕ вызывают `SaveChanges/SaveChangesAsync` и НЕ управляют транзакциями
+- Коммит выполняется через `IUnitOfWork.SaveChanges/SaveChangesAsync` на уровне сервисов
+- Методы чтения — асинхронные и принимают `CancellationToken cancellationToken = default`
+- Методы команд (Create/Update/Delete) могут быть синхронными, если не содержат `await`
 - Использовать `AsNoTracking()` для запросов на чтение
-- Использовать `OrderParameters<TModel>` для гибкой сортировки в QueryOptions
+- Использовать `OrderParameters<TModel>` для гибкой сортировки в QueryOptions (если этот механизм есть в проекте)
 - Регистрировать репозиторий как `AddScoped` в контейнере зависимостей (DI)
-- Зарегистрировать в секции репозиториев файла `ServiceRegistration.cs`
+- Зарегистрировать `IUnitOfWork/UnitOfWork` как `AddScoped` в контейнере зависимостей (DI)
+- Регистрацию выполнять в composition root проекта (например, `Program.cs` или `ServiceRegistration.cs`)
 
 #### Нюансы по типам связей:
 
 **1. Без связей (например, Quote):**
 - НЕ создавать `EntityNameCommandOptions` (не нужны)
-- Метод `UpdateAsync` без параметра options
-- Простые QueryOptions только с фильтрацией и сортировкой
+- `Update` без параметра options
+- QueryOptions только с фильтрацией и сортировкой
 - НЕ использовать Include в методах чтения
 
 **2. Один-ко-одному (One-to-One):**
 - Создавать `EntityNameCommandOptions` для обновления связанной сущности
-- В `UpdateAsync` обновлять связь через навигационное свойство
+- В `Update` обновлять связь через навигационное свойство
 - В QueryOptions добавить `IncludeRelatedEntity` для загрузки связи
 - Использовать Include только при необходимости
 
 **3. Один-ко-многим (например, UsefulLinkType → UsefulLink):**
 - Создавать `EntityNameCommandOptions` с коллекцией связанных ID
-- В `UpdateAsync` загружать коллекцию и обновлять связи
+- В `Update` загружать коллекцию и обновлять связи
 - В QueryOptions добавить `IncludeRelatedEntities` для загрузки коллекции
-- Использовать `Collection().LoadAsync()` для обновления связей
+- Использовать `Collection().Load()` / `LoadAsync()` для обновления связей
 
 **4. Много-ко-многим (например, Books ↔ Tags):**
 - Создавать `EntityNameCommandOptions` с коллекциями связанных ID
-- В `CreateAsync` и `UpdateAsync` устанавливать связи через коллекции
+- В `Create` и `Update` устанавливать связи через коллекции
 - В QueryOptions добавить опции включения связанных коллекций
 - Обновлять связи через присвоение коллекций
 
@@ -52,6 +48,15 @@
 - Использовать рекурсивные методы для загрузки иерархии
 - В QueryOptions добавить опции для работы с иерархией
 - Учитывать производительность при загрузке глубоких иерархий
+
+### Внимание
+
+- база данных может состоять из таблиц которые имеют следующие связи:
+  - без связей (например, Quote ; RepositoryQuote)
+  - один-ко-одному (One-to-One, нет примера в проекте)
+  - один-ко-многим (One-to-Many, например, UsefulLinkType → UsefulLink ; RepositoryUsefulLinkType ↔ RepositoryUsefulLink
+  - много-ко-многим (Many-to-Many, например, Books ↔ Tags ; RepositoryBook ↔ RepositoryTag)
+  - самореферентные связи (Self-Referencing, например, Topic → Topic ; RepositoryTopic)
 
 ### Создание класса опций
 
@@ -65,42 +70,23 @@ namespace Repositories.Ef.Options;
 public class EntityNameQueryOptions
 {
     public bool IncludeRelatedEntities { get; set; }
-    
+
     public OrderParameters<EntityName>? OrderParameters { get; set; }
-    
-    // Добавить другие опции фильтрации и сортировки
+
+    public string? Query { get; set; }
+    public int Skip { get; set; }
+    public int Take { get; set; }
 }
 
 public class EntityNameCommandOptions
 {
     public IEnumerable<int>? RelatedEntityIds { get; set; }
-    // Добавить другие связанные сущности по необходимости
 }
 ```
 
-### Создание интерфейса репозитория
+### Создание интерфейса и реализации репозитория (в одном файле)
 
 **Файл**: `src/Blog/Repositories.Ef/Api/RepositoryEntityName.cs`
-
-```csharp
-using Datasource.Ef.Models;
-using Repositories.Ef.Options;
-
-namespace Repositories.Ef.Api;
-
-public interface IRepositoryEntityName
-{
-    Task<EntityName> CreateAsync(EntityName model);
-    Task<EntityName> UpdateAsync(EntityName model, EntityNameCommandOptions? options = null);
-    Task DeleteAsync(EntityName model);
-
-    EntityName GetNew();
-    Task<EntityName?> GetSingleOrDefaultAsync(int id, EntityNameQueryOptions? options = null);
-    Task<IEnumerable<EntityName>> GetListAsync(EntityNameQueryOptions? options = null);
-}
-```
-
-### Создание реализации репозитория
 
 ```csharp
 using Datasource.Ef.Contexts;
@@ -110,51 +96,52 @@ using Repositories.Ef.Options;
 
 namespace Repositories.Ef.Api;
 
+public interface IRepositoryEntityName
+{
+    EntityName Create(EntityName model);
+    EntityName Update(EntityName model, EntityNameCommandOptions? options = null);
+    void Delete(EntityName model);
+
+    EntityName GetNew();
+
+    Task<EntityName?> GetSingleOrDefaultAsync(int id, EntityNameQueryOptions? options = null, CancellationToken cancellationToken = default);
+    Task<IEnumerable<EntityName>> GetListAsync(EntityNameQueryOptions? options = null, CancellationToken cancellationToken = default);
+}
+
 public class RepositoryEntityName : IRepositoryEntityName
 {
-    private readonly IDbContextFactory<DbContextBlog> contextFactory;
+    private readonly DbContextBlog context;
 
-    public RepositoryEntityName(IDbContextFactory<DbContextBlog> contextFactory)
+    public RepositoryEntityName(DbContextBlog context)
     {
-        this.contextFactory = contextFactory;
+        this.context = context;
     }
 
-    public async Task<EntityName> CreateAsync(EntityName model)
+    public EntityName Create(EntityName model)
     {
-        using var context = await contextFactory.CreateDbContextAsync();
-
-        await context.AddAsync(model);
-        await context.SaveChangesAsync();
-
+        context.Add(model);
         return model;
     }
 
-    public async Task<EntityName> UpdateAsync(EntityName model, EntityNameCommandOptions? options = null)
+    public EntityName Update(EntityName model, EntityNameCommandOptions? options = null)
     {
-        using var context = await contextFactory.CreateDbContextAsync();
-
         context.EntityNames.Update(model);
 
         if (options?.RelatedEntityIds != null)
         {
-            await context.Entry(model).Collection(p => p.RelatedEntities).LoadAsync();
-            
-            model.RelatedEntities = await context.RelatedEntities
-                .Where(related => options.RelatedEntityIds.Contains(related.Id))
-                .ToListAsync();
-        }
+            context.Entry(model).Collection(p => p.RelatedEntities).Load();
 
-        await context.SaveChangesAsync();
+            model.RelatedEntities = context.RelatedEntities
+                .Where(related => options.RelatedEntityIds.Contains(related.Id))
+                .ToList();
+        }
 
         return model;
     }
 
-    public async Task DeleteAsync(EntityName model)
+    public void Delete(EntityName model)
     {
-        using var context = await contextFactory.CreateDbContextAsync();
-
         context.Remove(model);
-        await context.SaveChangesAsync();
     }
 
     public EntityName GetNew()
@@ -162,10 +149,8 @@ public class RepositoryEntityName : IRepositoryEntityName
         return new EntityName() { Name = string.Empty };
     }
 
-    public async Task<EntityName?> GetSingleOrDefaultAsync(int id, EntityNameQueryOptions? options = null)
+    public async Task<EntityName?> GetSingleOrDefaultAsync(int id, EntityNameQueryOptions? options = null, CancellationToken cancellationToken = default)
     {
-        using var context = await contextFactory.CreateDbContextAsync();
-
         var query = context.EntityNames.AsNoTracking();
 
         if (options != null && options.IncludeRelatedEntities)
@@ -173,13 +158,11 @@ public class RepositoryEntityName : IRepositoryEntityName
             query = query.Include(p => p.RelatedEntities);
         }
 
-        return await query.FirstOrDefaultAsync(p => p.Id == id);
+        return await query.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
-    public async Task<IEnumerable<EntityName>> GetListAsync(EntityNameQueryOptions? options = null)
+    public async Task<IEnumerable<EntityName>> GetListAsync(EntityNameQueryOptions? options = null, CancellationToken cancellationToken = default)
     {
-        using var context = await contextFactory.CreateDbContextAsync();
-
         var query = context.EntityNames.AsNoTracking();
 
         if (options != null && options.IncludeRelatedEntities)
@@ -187,13 +170,77 @@ public class RepositoryEntityName : IRepositoryEntityName
             query = query.Include(p => p.RelatedEntities);
         }
 
-        if (options?.OrderParameters?.OrderColumns != null && options?.OrderParameters?.OrderColumns.Count > 0)
+        if (!string.IsNullOrWhiteSpace(options?.Query))
+        {
+            var lowerQuery = options.Query.ToLowerInvariant();
+            query = query.Where(p => p.Name.ToLower().Contains(lowerQuery));
+        }
+
+        if (options?.OrderParameters?.OrderColumns != null && options.OrderParameters.OrderColumns.Count > 0)
         {
             query = options.OrderParameters.ApplySorting(query, false);
         }
 
-        return await query.ToListAsync();
+        if (options != null)
+        {
+            var safeSkip = Math.Max(0, options.Skip);
+            var safeTake = Math.Clamp(options.Take <= 0 ? 50 : options.Take, 1, 200);
+
+            query = query.Skip(safeSkip).Take(safeTake);
+        }
+
+        return await query.ToListAsync(cancellationToken);
     }
+}
+```
+
+### Unit Of Work
+
+**Файл**: `src/Blog/Repositories.Ef/Api/UnitOfWork.cs`
+
+```csharp
+using Microsoft.EntityFrameworkCore.Storage;
+using System.ComponentModel;
+
+namespace Repositories.Ef.Api;
+
+public interface IUnitOfWork : IDisposable, IAsyncDisposable
+{
+    IRepositoryEntityName EntityNames { get; }
+
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+    int SaveChanges();
+
+    Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
+    Task CommitTransactionAsync(IDbContextTransaction transaction, CancellationToken cancellationToken = default);
+    Task RollbackTransactionAsync(IDbContextTransaction transaction, CancellationToken cancellationToken = default);
+
+    [Obsolete("Не вызывать вручную: жизненный цикл управляется DI (Scoped).", false)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    new void Dispose();
+
+    [Obsolete("Не вызывать вручную: жизненный цикл управляется DI (Scoped).", false)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    new ValueTask DisposeAsync();
+}
+```
+
+### Использование Unit Of Work в сервисе
+
+```csharp
+var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+try
+{
+    repositoryEntityName.Create(modelA);
+    repositoryOther.Update(modelB);
+
+    await unitOfWork.SaveChangesAsync(cancellationToken);
+    await unitOfWork.CommitTransactionAsync(transaction, cancellationToken);
+}
+catch
+{
+    await unitOfWork.RollbackTransactionAsync(transaction, cancellationToken);
+    throw;
 }
 ```
 
@@ -204,6 +251,6 @@ public class RepositoryEntityName : IRepositoryEntityName
 Добавить в метод `AddDependencyInjectionExt`:
 
 ```csharp
-// Регистрация репозиториев
 services.AddScoped<IRepositoryEntityName, RepositoryEntityName>();
+services.AddScoped<IUnitOfWork, UnitOfWork>();
 ```
