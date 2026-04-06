@@ -9,8 +9,6 @@
 **Файл**: `src/Blog/Services/Models/EntityName.cs`
 
 ```csharp
-using Services.Models.Shared;
-
 namespace Services.Models;
 
 // === CREATE ===
@@ -21,20 +19,24 @@ public class EntityNameCreateRequest
 	public required ICollection<int> RelatedEntityDropdownSelectedIds { get; set; } = [];
 }
 
-public class EntityNameCreatePageResponse
+public class EntityNameDisplayCreateResponse
 {
 	public required string? Name { get; set; }
 	// Примечание: если модель из `Datasource.Ef/Models` содержит дополнительные поля, их необходимо добавить в эту модель.
 	public required ICollection<EntityNameRelatedEntityDropdownItem> RelatedEntityDropdownItems { get; set; } = [];
 }
 
+public class EntityNameCreateResponse
+{
+}
+
 // === UPDATE ===
-public class EntityNameUpdatePageRequest
+public class EntityNameDisplayUpdateRequest
 {
 	public required int Id { get; set; }
 }
 
-public class EntityNameUpdatePageResponse
+public class EntityNameDisplayUpdateResponse
 {
 	public required int Id { get; set; }
 	public required string Name { get; set; }
@@ -51,13 +53,17 @@ public class EntityNameUpdateRequest
 	public required ICollection<int> RelatedEntityDropdownSelectedIds { get; set; } = [];
 }
 
+public class EntityNameUpdateResponse
+{
+}
+
 // === DELETE ===
-public class EntityNameDeletePageRequest
+public class EntityNameDisplayDeleteRequest
 {
 	public required int Id { get; set; }
 }
 
-public class EntityNameDeletePageResponse
+public class EntityNameDisplayDeleteResponse
 {
 	public required int Id { get; set; }
 	public required string Name { get; set; }
@@ -75,12 +81,12 @@ public class EntityNameDeleteResponse
 }
 
 // === INFO ===
-public class EntityNameInfoPageRequest
+public class EntityNameInfoRequest
 {
 	public required int Id { get; set; }
 }
 
-public class EntityNameInfoPageResponse
+public class EntityNameDisplayInfoResponse
 {
 	public required int Id { get; set; }
 	public required string Name { get; set; }
@@ -90,15 +96,14 @@ public class EntityNameInfoPageResponse
 }
 
 // === LIST ===
-public class EntityNameListPageRequest
+public class EntityNameListRequest
 {
 	// Может содержать параметры для фильтрации и пагинации
 }
 
-public class EntityNameListPageResponse
+public class EntityNameDisplayListResponse
 {
 	public required ICollection<EntityNameListModel> EntityNames { get; set; } = [];
-  public required bool IsVisible { get; set; }
 	public required int EntityNameCount { get; set; }
 }
 
@@ -119,7 +124,7 @@ public class EntityNameRelatedEntityListModel
 
 // === DROPDOWN ===
 
-public class EntityNameRelatedEntityDropdownResponse
+public class EntityNameDisplayRelatedEntityDropdownResponse
 {
 	public required ICollection<EntityNameRelatedEntityDropdownItem> RelatedEntityDropdownItems { get; set; } = [];
 }
@@ -144,48 +149,48 @@ public static class EntityNameTexts
     {
         public static class Start
         {
-            public const string DisplayCreating = "Начало отображения страницы создания EntityName";
-            public const string DisplayUpdating = "Начало отображения страницы обновления EntityName";
-            public const string DisplayDeleting = "Начало отображения страницы удаления EntityName";
+            public const string DisplayCreating = "Начало загрузки данных для создания EntityName";
+            public const string DisplayUpdating = "Начало загрузки данных для обновления EntityName";
+            public const string DisplayDeleting = "Начало загрузки данных для удаления EntityName";
 
             public const string Creating = "Начало выполнения создания EntityName";
             public const string Updating = "Начало выполнения обновления EntityName";
             public const string Deleting = "Начало выполнения удаления EntityName";
 
-            public const string DisplayInfoLoading = "Начало отображения страницы просмотра EntityName";
-            public const string DisplayListLoading = "Начало отображения страницы списка EntityNames";
-            public const string DisplayRelatedEntityDropdownLoading = "Начало отображения выпадающего списка связанных сущностей";
+            public const string DisplayInfoLoading = "Начало загрузки данных для просмотра EntityName";
+            public const string DisplayListLoading = "Начало загрузки данных списка EntityNames";
+            public const string DisplayRelatedEntityDropdownLoading = "Начало загрузки данных выпадающего списка связанных сущностей";
 
         }
 
         public static class Success
         {
-            public const string DisplayCreateCompleted = "Страница создания EntityName успешно отображена";
-            public const string DisplayUpdateCompleted = "Страница обновления EntityName успешно отображена";
-            public const string DisplayDeleteCompleted = "Страница удаления EntityName успешно отображена";
+            public const string DisplayCreateCompleted = "Данные для создания EntityName успешно загружены";
+            public const string DisplayUpdateCompleted = "Данные для обновления EntityName успешно загружены";
+            public const string DisplayDeleteCompleted = "Данные для удаления EntityName успешно загружены";
 
             public const string CreateCompleted = "EntityName успешно создан";
             public const string UpdateCompleted = "EntityName успешно обновлен";
             public const string DeleteCompleted = "EntityName успешно удален";
 
-            public const string DisplayInfoCompleted = "Страница просмотра EntityName успешно отображена";
-            public const string DisplayListCompleted = "Страница списка EntityNames успешно отображена";
-            public const string DisplayRelatedEntityDropdownCompleted = "Выпадающий список связанных сущностей успешно отображён";
+            public const string DisplayInfoCompleted = "Данные для просмотра EntityName успешно загружены";
+            public const string DisplayListCompleted = "Данные списка EntityNames успешно загружены";
+            public const string DisplayRelatedEntityDropdownCompleted = "Данные выпадающего списка связанных сущностей успешно загружены";
         }
 
         public static class Error
         {
-            public const string DisplayCreateError = "Не удалось отобразить страницу создания EntityName";
-            public const string DisplayUpdateError = "Не удалось отобразить страницу обновления EntityName";
-            public const string DisplayDeleteError = "Не удалось отобразить страницу удаления EntityName";
+            public const string DisplayCreateError = "Не удалось загрузить данные для создания EntityName";
+            public const string DisplayUpdateError = "Не удалось загрузить данные для обновления EntityName";
+            public const string DisplayDeleteError = "Не удалось загрузить данные для удаления EntityName";
 
             public const string CreateError = "Не удалось создать EntityName";
             public const string UpdateError = "Не удалось обновить EntityName";
             public const string DeleteError = "Не удалось удалить EntityName";
 
-            public const string DisplayInfoError = "Не удалось отобразить страницу просмотра EntityName";
-            public const string DisplayListError = "Не удалось отобразить страницу списка EntityNames";
-            public const string DisplayRelatedEntityDropdownError = "Не удалось отобразить выпадающий список связанных сущностей";
+            public const string DisplayInfoError = "Не удалось загрузить данные для просмотра EntityName";
+            public const string DisplayListError = "Не удалось загрузить данные списка EntityNames";
+            public const string DisplayRelatedEntityDropdownError = "Не удалось загрузить данные выпадающего списка связанных сущностей";
 
             public const string NotFoundById = "EntityName не был найден по id";
         }
@@ -198,31 +203,30 @@ public static class EntityNameTexts
 **Файл**: `src/Blog/Services/Api/ServiceEntityName.cs`
 
 ```csharp
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Repositories.Ef.Api;
 using Repositories.Ef.Options;
 using Services.Texts;
-using Services.Enums;
 using Services.Exceptions;
 using Services.Models;
-using Services.Models.Shared;
 
 namespace Services.Api;
 
 public interface IServiceEntityName
 {
-    Task<ResponseInfo<EntityNameCreatePageResponse>> DisplayCreatePageAsync();
-    Task<ResponseInfo<EntityNameCreatePageResponse>> CreateAsync(EntityNameCreateRequest request);
+    Task<EntityNameDisplayCreateResponse> DisplayCreateAsync(CancellationToken cancellationToken);
+    Task<EntityNameCreateResponse> CreateAsync(EntityNameCreateRequest request, CancellationToken cancellationToken);
 
-    Task<ResponseInfo<EntityNameUpdatePageResponse>> DisplayUpdatePageAsync(EntityNameUpdatePageRequest request);
-    Task<ResponseInfo<EntityNameUpdatePageResponse>> UpdateAsync(EntityNameUpdateRequest request);
+    Task<EntityNameDisplayUpdateResponse> DisplayUpdateAsync(EntityNameDisplayUpdateRequest request, CancellationToken cancellationToken);
+    Task<EntityNameUpdateResponse> UpdateAsync(EntityNameUpdateRequest request, CancellationToken cancellationToken);
 
-    Task<ResponseInfo<EntityNameDeletePageResponse>> DisplayDeletePageAsync(EntityNameDeletePageRequest request);
-    Task<ResponseInfo<EntityNameDeleteResponse>> DeleteAsync(EntityNameDeleteRequest request);
+    Task<EntityNameDisplayDeleteResponse> DisplayDeleteAsync(EntityNameDisplayDeleteRequest request, CancellationToken cancellationToken);
+    Task<EntityNameDeleteResponse> DeleteAsync(EntityNameDeleteRequest request, CancellationToken cancellationToken);
     
-    Task<ResponseInfo<EntityNameInfoPageResponse>> DisplayInfoPageAsync(EntityNameInfoPageRequest request);
-    Task<ResponseInfo<EntityNameListPageResponse>> DisplayListPageAsync(EntityNameListPageRequest request);
-    Task<ResponseInfo<EntityNameRelatedEntityDropdownResponse>> DisplayRelatedEntityDropdownItemsAsync();
+    Task<EntityNameDisplayInfoResponse> DisplayInfoAsync(EntityNameInfoRequest request, CancellationToken cancellationToken);
+    Task<EntityNameDisplayListResponse> DisplayListAsync(EntityNameListRequest request, CancellationToken cancellationToken);
+    Task<EntityNameDisplayRelatedEntityDropdownResponse> DisplayRelatedEntityDropdownItemsAsync(CancellationToken cancellationToken);
 }
 ```
 
@@ -242,45 +246,37 @@ public class ServiceEntityName : IServiceEntityName
         this.logger = logger;
     }
 
-    public async Task<ResponseInfo<EntityNameCreatePageResponse>> DisplayCreatePageAsync()
+    public async Task<EntityNameDisplayCreateResponse> DisplayCreateAsync(CancellationToken cancellationToken)
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.DisplayCreating);
 
         try
         {
-            var relatedEntities = await repositoryRelatedEntity.GetListAsync();
+            var relatedEntities = await repositoryRelatedEntity.GetListAsync(cancellationToken);
             var relatedEntityDropdownItems = relatedEntities.Select(relatedEntity => new EntityNameRelatedEntityDropdownItem
             {
                 Id = relatedEntity.Id,
                 Name = relatedEntity.Name,
             });
 
-            var response = new EntityNameCreatePageResponse
+            var response = new EntityNameDisplayCreateResponse
             {
                 Name = string.Empty,
                 RelatedEntityDropdownItems = [.. relatedEntityDropdownItems]
             };
 
-            var responseInfo = ResponseInfo.Success(
-                response,
-                MessageType.LOADED,
-                EntityNameTexts.Messages.Success.DisplayCreateCompleted);
-
             logger.LogInformation(EntityNameTexts.Messages.Success.DisplayCreateCompleted);
 
-            return responseInfo;
+            return response;
         }
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.DisplayCreateError}. Ошибка: {exception.Message}");
-
-            return ResponseInfo.Error<EntityNameCreatePageResponse>(
-                MessageType.ERROR,
-                EntityNameTexts.Messages.Error.DisplayCreateError);
+            throw;
         }
     }
 
-    public async Task<ResponseInfo<EntityNameCreatePageResponse>> CreateAsync(EntityNameCreateRequest request)
+    public async Task<EntityNameCreateResponse> CreateAsync(EntityNameCreateRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.Creating);
 
@@ -289,40 +285,34 @@ public class ServiceEntityName : IServiceEntityName
             var model = repositoryEntityName.GetNew();
             model.Name = request.Name;
 
-            var entityNameCommandOptions = new EntityNameCommandOptions { RelatedEntityIds = request.RelatedEntityIds };
-            await repositoryEntityName.CreateAsync(model, entityNameCommandOptions);
+            var entityNameCommandOptions = new EntityNameCommandOptions { RelatedEntityIds = request.RelatedEntityDropdownSelectedIds };
 
-            var responseInfo = ResponseInfo.Success<EntityNameCreatePageResponse>(
-                MessageType.SAVED,
-                EntityNameTexts.Messages.Success.CreateCompleted);
+            var response = await repositoryEntityName.CreateAsync(model, entityNameCommandOptions, cancellationToken);
 
             logger.LogInformation(EntityNameTexts.Messages.Success.CreateCompleted);
 
-            return responseInfo;
+            return response;
         }
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.CreateError}. Ошибка: {exception.Message}");
-
-            return ResponseInfo.Error<EntityNameCreatePageResponse>(
-                MessageType.ERROR,
-                EntityNameTexts.Messages.Error.CreateError);
+            throw;
         }
     }
 
-    public async Task<ResponseInfo<EntityNameUpdatePageResponse>> DisplayUpdatePageAsync(EntityNameUpdatePageRequest request)
+    public async Task<EntityNameDisplayUpdateResponse> DisplayUpdateAsync(EntityNameDisplayUpdateRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.DisplayUpdating);
 
         try
         {
             var entityNameQueryOptions = new EntityNameQueryOptions { IncludeRelatedEntities = true };
-            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, entityNameQueryOptions);
+            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, entityNameQueryOptions, cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
 
-            var relatedEntities = await repositoryRelatedEntity.GetListAsync();
+            var relatedEntities = await repositoryRelatedEntity.GetListAsync(cancellationToken);
             var relatedEntityDropdownItems = relatedEntities.Select(relatedEntity => new EntityNameRelatedEntityDropdownItem
             {
                 Id = relatedEntity.Id,
@@ -330,142 +320,115 @@ public class ServiceEntityName : IServiceEntityName
             });
             var relatedEntityDropdownSelectedIds = model.RelatedEntities.Select(relatedEntity => relatedEntity.Id);
 
-            var response = new EntityNameUpdatePageResponse
+            var response = new EntityNameDisplayUpdateResponse
             {
                 Id = model.Id,
                 Name = model.Name,
-                RelatedEntityIds = [.. relatedEntityDropdownSelectedIds],
+                RelatedEntityDropdownSelectedIds = [.. relatedEntityDropdownSelectedIds],
                 RelatedEntityDropdownItems = [.. relatedEntityDropdownItems] 
             };
 
-            var responseInfo = ResponseInfo.Success(
-                response,
-                MessageType.LOADED,
-                EntityNameTexts.Messages.Success.DisplayUpdateCompleted);
-
             logger.LogInformation(EntityNameTexts.Messages.Success.DisplayUpdateCompleted);
 
-            return responseInfo;
+            return response;
         }
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.DisplayUpdateError}. Ошибка: {exception.Message}");
-
-            return ResponseInfo.Error<EntityNameUpdatePageResponse>(
-                MessageType.ERROR,
-                EntityNameTexts.Messages.Error.DisplayUpdateError);
+            throw;
         }
     }
 
-    public async Task<ResponseInfo<EntityNameUpdatePageResponse>> UpdateAsync(EntityNameUpdateRequest request)
+    public async Task<EntityNameUpdateResponse> UpdateAsync(EntityNameUpdateRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.Updating);
 
         try
         {
-            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id);
+            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
 
             model.Name = request.Name;
 
-            var entityNameCommandOptions = new EntityNameCommandOptions { RelatedEntityIds = request.RelatedEntityIds };
-            await repositoryEntityName.UpdateAsync(model, entityNameCommandOptions);
-
-            var responseInfo = ResponseInfo.Success<EntityNameUpdatePageResponse>(
-                MessageType.SAVED,
-                EntityNameTexts.Messages.Success.UpdateCompleted);
+            var entityNameCommandOptions = new EntityNameCommandOptions { RelatedEntityIds = request.RelatedEntityDropdownSelectedIds };
+            
+            var response = await repositoryEntityName.UpdateAsync(model, entityNameCommandOptions, cancellationToken);
 
             logger.LogInformation(EntityNameTexts.Messages.Success.UpdateCompleted);
 
-            return responseInfo;
+            return response;
         }
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.UpdateError}. Ошибка: {exception.Message}");
-
-            return ResponseInfo.Error<EntityNameUpdatePageResponse>(
-                MessageType.ERROR,
-                EntityNameTexts.Messages.Error.UpdateError);
+            throw;
         }
     }
 
-    public async Task<ResponseInfo<EntityNameDeletePageResponse>> DisplayDeletePageAsync(EntityNameDeletePageRequest request)
+    public async Task<EntityNameDisplayDeleteResponse> DisplayDeleteAsync(EntityNameDisplayDeleteRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.DisplayDeleting);
 
         try
         {
-            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id);
+            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
 
-            var response = new EntityNameDeletePageResponse
+            var response = new EntityNameDisplayDeleteResponse
             {
                 Id = model.Id,
                 Name = model.Name
             };
 
-            var responseInfo = ResponseInfo.Success(
-                response,
-                MessageType.LOADED,
-                EntityNameTexts.Messages.Success.DisplayDeleteCompleted);
-
             logger.LogInformation(EntityNameTexts.Messages.Success.DisplayDeleteCompleted);
 
-            return responseInfo;
+            return response;
         }
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.DisplayDeleteError}. Ошибка: {exception.Message}");
-
-            return ResponseInfo.Error<EntityNameDeletePageResponse>(
-                MessageType.ERROR,
-                EntityNameTexts.Messages.Error.DisplayDeleteError);
+            throw;
         }
     }
 
-    public async Task<ResponseInfo<EntityNameDeleteResponse>> DeleteAsync(EntityNameDeleteRequest request)
+    public async Task<EntityNameDeleteResponse> DeleteAsync(EntityNameDeleteRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.Deleting);
 
         try
         {
-            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id);
+            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
 
-            await repositoryEntityName.DeleteAsync(model);
-
-            var responseInfo = ResponseInfo.Success<EntityNameDeleteResponse>(
-                MessageType.SAVED,
-                EntityNameTexts.Messages.Success.DeleteCompleted);
+            await repositoryEntityName.DeleteAsync(model, cancellationToken);
+            
+            var response = new EntityNameDeleteResponse { IsDeleted = true };
 
             logger.LogInformation(EntityNameTexts.Messages.Success.DeleteCompleted);
 
-            return responseInfo;
+            return response;
         }
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.DeleteError}. Ошибка: {exception.Message}");
-
-            return ResponseInfo.Error<EntityNameDeleteResponse>(
-                MessageType.ERROR,
-                EntityNameTexts.Messages.Error.DeleteError);
+            throw;
         }
     }
 
-    public async Task<ResponseInfo<EntityNameInfoPageResponse>> DisplayInfoPageAsync(EntityNameInfoPageRequest request)
+    public async Task<EntityNameDisplayInfoResponse> DisplayInfoAsync(EntityNameInfoRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.DisplayInfoLoading);
 
         try
         {
             var entityNameQueryOptions = new EntityNameQueryOptions { IncludeRelatedEntities = true };
-            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, entityNameQueryOptions);
+            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, entityNameQueryOptions, cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
@@ -476,7 +439,7 @@ public class ServiceEntityName : IServiceEntityName
                 Name = relatedEntity.Name
             }).ToList() ?? [];
 
-            var response = new EntityNameInfoPageResponse
+            var response = new EntityNameDisplayInfoResponse
             {
                 Id = model.Id,
                 Name = model.Name,
@@ -484,33 +447,25 @@ public class ServiceEntityName : IServiceEntityName
                 RelatedEntities = relatedEntities,
             };
 
-            var responseInfo = ResponseInfo.Success(
-                response,
-                MessageType.LOADED,
-                EntityNameTexts.Messages.Success.DisplayInfoCompleted);
-
             logger.LogInformation(EntityNameTexts.Messages.Success.DisplayInfoCompleted);
 
-            return responseInfo;
+            return response;
         }
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.DisplayInfoError}. Ошибка: {exception.Message}");
-
-            return ResponseInfo.Error<EntityNameInfoPageResponse>(
-                MessageType.ERROR,
-                EntityNameTexts.Messages.Error.DisplayInfoError);
+            throw;
         }
     }
 
-    public async Task<ResponseInfo<EntityNameListPageResponse>> DisplayListPageAsync(EntityNameListPageRequest request)
+    public async Task<EntityNameDisplayListResponse> DisplayListAsync(EntityNameListRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.DisplayListLoading);
 
         try
         {
             var entityNameQueryOptions = new EntityNameQueryOptions { OrderByNameAsc = true, IncludeRelatedEntities = true };
-            var models = await repositoryEntityName.GetListAsync(entityNameQueryOptions);
+            var models = await repositoryEntityName.GetListAsync(entityNameQueryOptions, cancellationToken);
 
             var entityNames = models.Select(model => new EntityNameListModel
             {
@@ -523,72 +478,50 @@ public class ServiceEntityName : IServiceEntityName
                      }).ToList() ?? []
             });
 
-            var response = new EntityNameListPageResponse
+            var response = new EntityNameDisplayListResponse
             {
                 EntityNames = [.. entityNames],
-                EntityNameCount = entityNames.Count,
+                EntityNameCount = entityNames.Count(),
             };
-
-            var responseInfo = ResponseInfo.Success(
-                response,
-                MessageType.LOADED,
-                EntityNameTexts.Messages.Success.DisplayListCompleted);
 
             logger.LogInformation(EntityNameTexts.Messages.Success.DisplayListCompleted);
 
-            return responseInfo;
+            return response;
         }
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.DisplayListError}. Ошибка: {exception.Message}");
-
-            return ResponseInfo.Error<EntityNameListPageResponse>(
-                MessageType.ERROR,
-                EntityNameTexts.Messages.Error.DisplayListError);
+            throw;
         }
     }
 
-    public async Task<ResponseInfo<EntityNameRelatedEntityDropdownResponse>> DisplayRelatedEntityDropdownItemsAsync()
+    public async Task<EntityNameDisplayRelatedEntityDropdownResponse> DisplayRelatedEntityDropdownItemsAsync(CancellationToken cancellationToken)
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.DisplayRelatedEntityDropdownLoading);
 
         try
         {
             var relatedEntityQueryOptions = new RelatedEntityQueryOptions { OrderByNameAsc = true };
-            var models = await repositoryRelatedEntity.GetListAsync(relatedEntityQueryOptions);
+            var models = await repositoryRelatedEntity.GetListAsync(relatedEntityQueryOptions, cancellationToken);
             var relatedEntityDropdownItems = models.Select(model => new EntityNameRelatedEntityDropdownItem
             {
                 Id = model.Id,
                 Name = model.Name
             });
 
-            var response = new EntityNameRelatedEntityDropdownResponse
+            var response = new EntityNameDisplayRelatedEntityDropdownResponse
             {
                 RelatedEntityDropdownItems = [.. relatedEntityDropdownItems]
             };
 
-            var responseInfo = ResponseInfo.Success(
-                response,
-                MessageType.LOADED,
-                EntityNameTexts.Messages.Success.DisplayRelatedEntityDropdownCompleted);
-
             logger.LogInformation(EntityNameTexts.Messages.Success.DisplayRelatedEntityDropdownCompleted);
 
-            return responseInfo;
+            return response;
         }
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.DisplayRelatedEntityDropdownError}. Ошибка: {exception.Message}");
-
-            var response = new EntityNameRelatedEntityDropdownResponse
-            {
-                RelatedEntityDropdownItems = []
-            };
-
-            return ResponseInfo.Error(
-                response,
-                MessageType.ERROR,
-                EntityNameTexts.Messages.Error.DisplayRelatedEntityDropdownError);
+            throw;
         }
     }
 }
