@@ -235,14 +235,12 @@ public interface IServiceEntityName
 ```csharp
 public class ServiceEntityName : IServiceEntityName
 {
-    private readonly IRepositoryEntityName repositoryEntityName;
-    private readonly IRepositoryRelatedEntity repositoryRelatedEntity;
+    private readonly IUnitOfWork unitOfWork;
     private readonly ILogger<ServiceEntityName> logger;
 
-    public ServiceEntityName(IRepositoryEntityName repositoryEntityName, IRepositoryRelatedEntity repositoryRelatedEntity, ILogger<ServiceEntityName> logger)
+    public ServiceEntityName(IUnitOfWork unitOfWork, ILogger<ServiceEntityName> logger)
     {
-        this.repositoryEntityName = repositoryEntityName;
-        this.repositoryRelatedEntity = repositoryRelatedEntity;
+        this.unitOfWork = unitOfWork;
         this.logger = logger;
     }
 
@@ -252,7 +250,7 @@ public class ServiceEntityName : IServiceEntityName
 
         try
         {
-            var relatedEntities = await repositoryRelatedEntity.GetListAsync(cancellationToken);
+            var relatedEntities = await unitOfWork.RelatedEntities.GetListAsync(cancellationToken);
             var relatedEntityDropdownItems = relatedEntities.Select(relatedEntity => new EntityNameRelatedEntityDropdownItem
             {
                 Id = relatedEntity.Id,
@@ -280,14 +278,18 @@ public class ServiceEntityName : IServiceEntityName
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.Creating);
 
+        var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            var model = repositoryEntityName.GetNew();
+            var model = unitOfWork.EntityNames.GetNew();
             model.Name = request.Name;
 
             var entityNameCommandOptions = new EntityNameCommandOptions { RelatedEntityIds = request.RelatedEntityDropdownSelectedIds };
 
-            var response = await repositoryEntityName.CreateAsync(model, entityNameCommandOptions, cancellationToken);
+            var response = unitOfWork.EntityNames.Create(model, entityNameCommandOptions);
+
+             await unitOfWork.SaveChangesAsync(cancellationToken);
+             await unitOfWork.CommitTransactionAsync(transaction, cancellationToken);
 
             logger.LogInformation(EntityNameTexts.Messages.Success.CreateCompleted);
 
@@ -296,6 +298,7 @@ public class ServiceEntityName : IServiceEntityName
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.CreateError}. Ошибка: {exception.Message}");
+            await unitOfWork.RollbackTransactionAsync(transaction, cancellationToken);
             throw;
         }
     }
@@ -307,12 +310,12 @@ public class ServiceEntityName : IServiceEntityName
         try
         {
             var entityNameQueryOptions = new EntityNameQueryOptions { IncludeRelatedEntities = true };
-            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, entityNameQueryOptions, cancellationToken);
+            var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, entityNameQueryOptions, cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
 
-            var relatedEntities = await repositoryRelatedEntity.GetListAsync(cancellationToken);
+            var relatedEntities = await unitOfWork.RelatedEntities.GetListAsync(cancellationToken);
             var relatedEntityDropdownItems = relatedEntities.Select(relatedEntity => new EntityNameRelatedEntityDropdownItem
             {
                 Id = relatedEntity.Id,
@@ -343,9 +346,10 @@ public class ServiceEntityName : IServiceEntityName
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.Updating);
 
+        var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, cancellationToken);
+            var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
@@ -354,7 +358,10 @@ public class ServiceEntityName : IServiceEntityName
 
             var entityNameCommandOptions = new EntityNameCommandOptions { RelatedEntityIds = request.RelatedEntityDropdownSelectedIds };
             
-            var response = await repositoryEntityName.UpdateAsync(model, entityNameCommandOptions, cancellationToken);
+            var response = unitOfWork.EntityNames.Update(model, entityNameCommandOptions);
+
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            await unitOfWork.CommitTransactionAsync(transaction, cancellationToken);
 
             logger.LogInformation(EntityNameTexts.Messages.Success.UpdateCompleted);
 
@@ -363,6 +370,7 @@ public class ServiceEntityName : IServiceEntityName
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.UpdateError}. Ошибка: {exception.Message}");
+            await unitOfWork.RollbackTransactionAsync(transaction, cancellationToken);
             throw;
         }
     }
@@ -373,7 +381,7 @@ public class ServiceEntityName : IServiceEntityName
 
         try
         {
-            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, cancellationToken);
+            var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
@@ -399,14 +407,18 @@ public class ServiceEntityName : IServiceEntityName
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.Deleting);
 
+        var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, cancellationToken);
+            var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
 
-            await repositoryEntityName.DeleteAsync(model, cancellationToken);
+            unitOfWork.EntityNames.Delete(model);
+            
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            await unitOfWork.CommitTransactionAsync(transaction, cancellationToken);
             
             var response = new EntityNameDeleteResponse { IsDeleted = true };
 
@@ -417,6 +429,7 @@ public class ServiceEntityName : IServiceEntityName
         catch (Exception exception)
         {
             logger.LogError(exception, $"{EntityNameTexts.Messages.Error.DeleteError}. Ошибка: {exception.Message}");
+            await unitOfWork.RollbackTransactionAsync(transaction, cancellationToken);
             throw;
         }
     }
@@ -428,7 +441,7 @@ public class ServiceEntityName : IServiceEntityName
         try
         {
             var entityNameQueryOptions = new EntityNameQueryOptions { IncludeRelatedEntities = true };
-            var model = await repositoryEntityName.GetSingleOrDefaultAsync(request.Id, entityNameQueryOptions, cancellationToken);
+            var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, entityNameQueryOptions, cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
@@ -465,7 +478,7 @@ public class ServiceEntityName : IServiceEntityName
         try
         {
             var entityNameQueryOptions = new EntityNameQueryOptions { OrderByNameAsc = true, IncludeRelatedEntities = true };
-            var models = await repositoryEntityName.GetListAsync(entityNameQueryOptions, cancellationToken);
+            var models = await unitOfWork.EntityNames.GetListAsync(entityNameQueryOptions, cancellationToken);
 
             var entityNames = models.Select(model => new EntityNameListModel
             {
@@ -502,7 +515,7 @@ public class ServiceEntityName : IServiceEntityName
         try
         {
             var relatedEntityQueryOptions = new RelatedEntityQueryOptions { OrderByNameAsc = true };
-            var models = await repositoryRelatedEntity.GetListAsync(relatedEntityQueryOptions, cancellationToken);
+            var models = await unitOfWork.RelatedEntities.GetListAsync(relatedEntityQueryOptions, cancellationToken);
             var relatedEntityDropdownItems = models.Select(model => new EntityNameRelatedEntityDropdownItem
             {
                 Id = model.Id,
