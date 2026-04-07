@@ -7,6 +7,7 @@
 - Название классов опций: `EntityNameQueryOptions` и `EntityNameCommandOptions` (если нужны)
 - Интерфейс и реализация репозитория должны находиться в одном файле
 - Репозиторий получает `DbContextBlog` через DI (Scoped)
+- Для каждой Entity/модели, с которой работает сервисный слой, должен быть создан репозиторий (интерфейс + реализация), а также соответствующее свойство в `IUnitOfWork` (только если оно реально используется сервисами)
 - Репозитории НЕ вызывают `SaveChanges/SaveChangesAsync` и НЕ управляют транзакциями
 - Коммит выполняется через `IUnitOfWork.SaveChanges/SaveChangesAsync` на уровне сервисов
 - Методы чтения — асинхронные и принимают `CancellationToken cancellationToken = default`
@@ -19,44 +20,49 @@
 
 #### Нюансы по типам связей:
 
-**1. Без связей (например, Quote):**
+**1. База данных может состоять из таблиц, которые имеют следующие типы связей:**
+  - без связей (например, Quote; RepositoryQuote)
+  - один-ко-одному (One-to-One, нет примера в проекте)
+  - один-ко-многим (One-to-Many, например, UsefulLinkType → UsefulLink; RepositoryUsefulLinkType ↔ RepositoryUsefulLink)
+  - много-ко-многим (Many-to-Many, например, Books ↔ Tags; RepositoryBook ↔ RepositoryTag)
+  - самореферентные связи (Self-Referencing, например, Topic → Topic; RepositoryTopic)
+
+**2. Основная и связанная модели (общая логика репозиториев):**
+- Если есть основная модель и связанные модели (например, `Order` и `OrderItem`), репозитории создаются для обеих моделей
+- Репозиторий основной модели отвечает за CRUD самой сущности и управление связями через `CommandOptions` (например, список `OrderItemIds` для привязки товаров к заказу)
+- Если у основной модели несколько разных связей (например, `Order` связан и с `OrderItem`, и с `Customer`, и с `DeliveryMethod`), то в репозитории основной модели должна быть отдельная логика управления каждой связью (через отдельные поля в `CommandOptions` и соответствующие блоки обновления связей)
+- Репозиторий связанной модели отвечает за CRUD связанной сущности и чтение списков/одиночных записей, которые нужны сервисам (например, список товаров для dropdown, проверка существования, загрузка карточки товара)
+- В `IUnitOfWork` перечисляются репозитории только тех моделей, которые реально используются сервисным слоем; `unitOfWork.RelatedEntities` — пример связанной модели и должен добавляться только если такая сущность/связь есть и она требуется сервисам (например, `unitOfWork.Orders` и `unitOfWork.OrderItems`)
+
+**3. Без связей (например, Quote):**
 - НЕ создавать `EntityNameCommandOptions` (не нужны)
 - `Update` без параметра options
 - QueryOptions только с фильтрацией и сортировкой
 - НЕ использовать Include в методах чтения
 
-**2. Один-ко-одному (One-to-One):**
+**4. Один-ко-одному (One-to-One):**
 - Создавать `EntityNameCommandOptions` для обновления связанной сущности
 - В `Update` обновлять связь через навигационное свойство
 - В QueryOptions добавить `IncludeRelatedEntity` для загрузки связи
 - Использовать Include только при необходимости
 
-**3. Один-ко-многим (например, UsefulLinkType → UsefulLink):**
+**5. Один-ко-многим (например, UsefulLinkType → UsefulLink):**
 - Создавать `EntityNameCommandOptions` с коллекцией связанных ID
 - В `Update` загружать коллекцию и обновлять связи
 - В QueryOptions добавить `IncludeRelatedEntities` для загрузки коллекции
 - Использовать `Collection().Load()` / `LoadAsync()` для обновления связей
 
-**4. Много-ко-многим (например, Books ↔ Tags):**
+**6. Много-ко-многим (например, Books ↔ Tags):**
 - Создавать `EntityNameCommandOptions` с коллекциями связанных ID
 - В `Create` и `Update` устанавливать связи через коллекции
 - В QueryOptions добавить опции включения связанных коллекций
 - Обновлять связи через присвоение коллекций
 
-**5. Самореферентные связи (например, Topic → Topic):**
+**7. Самореферентные связи (например, Topic → Topic):**
 - Добавлять опции для фильтрации по родительским/дочерним элементам
 - Использовать рекурсивные методы для загрузки иерархии
 - В QueryOptions добавить опции для работы с иерархией
 - Учитывать производительность при загрузке глубоких иерархий
-
-### Внимание
-
-- база данных может состоять из таблиц которые имеют следующие связи:
-  - без связей (например, Quote ; RepositoryQuote)
-  - один-ко-одному (One-to-One, нет примера в проекте)
-  - один-ко-многим (One-to-Many, например, UsefulLinkType → UsefulLink ; RepositoryUsefulLinkType ↔ RepositoryUsefulLink
-  - много-ко-многим (Many-to-Many, например, Books ↔ Tags ; RepositoryBook ↔ RepositoryTag)
-  - самореферентные связи (Self-Referencing, например, Topic → Topic ; RepositoryTopic)
 
 ### Создание класса опций
 
@@ -98,7 +104,7 @@ namespace Repositories.Ef.Api;
 
 public interface IRepositoryEntityName
 {
-    EntityName Create(EntityName model);
+    EntityName Create(EntityName model, EntityNameCommandOptions? options = null);
     EntityName Update(EntityName model, EntityNameCommandOptions? options = null);
     void Delete(EntityName model);
 
@@ -117,9 +123,19 @@ public class RepositoryEntityName : IRepositoryEntityName
         this.context = context;
     }
 
-    public EntityName Create(EntityName model)
+    public EntityName Create(EntityName model, EntityNameCommandOptions? options = null)
     {
         context.Add(model);
+
+        if (options?.RelatedEntityIds != null)
+        {
+            context.Entry(model).Collection(p => p.RelatedEntities).Load();
+
+            model.RelatedEntities = context.RelatedEntities
+                .Where(related => options.RelatedEntityIds.Contains(related.Id))
+                .ToList();
+        }
+
         return model;
     }
 
@@ -207,6 +223,7 @@ namespace Repositories.Ef.Api;
 public interface IUnitOfWork : IDisposable, IAsyncDisposable
 {
     IRepositoryEntityName EntityNames { get; }
+    IRepositoryRelatedEntity RelatedEntities { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     int SaveChanges();
@@ -231,8 +248,8 @@ public interface IUnitOfWork : IDisposable, IAsyncDisposable
 var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
 try
 {
-    repositoryEntityName.Create(modelA);
-    repositoryOther.Update(modelB);
+    unitOfWork.EntityNames.Create(modelA);
+    unitOfWork.RelatedEntities.Update(modelB);
 
     await unitOfWork.SaveChangesAsync(cancellationToken);
     await unitOfWork.CommitTransactionAsync(transaction, cancellationToken);

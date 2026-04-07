@@ -2,9 +2,41 @@
 
 ### 6.1 Требования
 
-Требования находятся в правилах Cursor: [.cursor/rules/promt_06_service.rules](../../.cursor/rules/promt_06_service.rules)
+- Сервисный слой реализует бизнес-операции для сущности `EntityName` поверх репозиториев и `IUnitOfWork`, без прямого доступа к `DbContext`
+- Для сервиса должны быть созданы:
+  - DTO-модели запросов/ответов в `src/Blog/Services/Models/EntityName.cs`
+  - класс текстовых констант в `src/Blog/Services/Texts/EntityNameTexts.cs`
+  - интерфейс `IServiceEntityName` и реализация `ServiceEntityName` в `src/Blog/Services/Api/ServiceEntityName.cs`
+- Именование:
+  - интерфейс: `IServiceEntityName`, реализация: `ServiceEntityName`
+  - модели: `EntityName{Operation}Request/Response` и `EntityNameDisplay{Operation}Request/Response` (как в примере ниже)
+- DI:
+  - сервис регистрировать как `AddScoped<IServiceEntityName, ServiceEntityName>()`
+  - сервис получает зависимости через конструктор: `IUnitOfWork` и `ILogger<ServiceEntityName>`
+- Асинхронность и отмена:
+  - все публичные методы сервиса асинхронные и принимают `CancellationToken cancellationToken` (передавать дальше во все `...Async`)
+- Транзакции и коммит:
+  - `Create/Update/Delete` выполняются в транзакции `unitOfWork.BeginTransactionAsync(...)`
+  - коммит изменений выполнять через `unitOfWork.SaveChangesAsync(...)` и `unitOfWork.CommitTransactionAsync(...)`
+  - при ошибке обязательно вызывать `unitOfWork.RollbackTransactionAsync(...)` и пробрасывать исключение дальше
+  - `Display*`, `DisplayInfo`, `DisplayList`, `DisplayRelatedEntityDropdownItems` не должны вызывать `SaveChanges` и не должны открывать транзакции
+- Доступ к данным:
+  - для чтения использовать репозитории из `unitOfWork` и при необходимости передавать `QueryOptions` (например, `IncludeRelatedEntities = true`)
+  - для команд использовать `CommandOptions` для управления связями (например, `RelatedEntityIds`)
+  - детали контрактов репозиториев/`IUnitOfWork`/`QueryOptions`/`CommandOptions` описаны в `promt_05_repository.md`; сервис не должен придумывать новые опции или свойства (например, `OrderByNameAsc`), которых нет в репозиторном промте
+  - `Include*` опции добавлять только если у сущности есть соответствующие связи и они реально нужны в текущей операции; если связей несколько — в `QueryOptions` должно быть несколько `Include*` флагов (по одному на каждую связь), как описано в репозиторном промте
+- Обработка отсутствующих данных:
+  - если сущность не найдена, выбрасывать `NotFoundException` с сообщением из `EntityNameTexts.Messages.Error.NotFoundById`
+- Логирование и тексты:
+  - в начале операций логировать `EntityNameTexts.Messages.Start.*`
+  - при успешном завершении логировать `EntityNameTexts.Messages.Success.*`
+  - при ошибке логировать `LogError(exception, "...")`, используя сообщения из `EntityNameTexts.Messages.Error.*`, и пробрасывать исключение
+  - не логировать входные модели целиком; не логировать потенциально чувствительные данные
+- Маппинг DTO:
+  - DTO должны содержать все поля, необходимые UI/API; коллекции инициализировать пустыми (`= []`)
+  - `Display*` методы возвращают данные для экранов/форм (включая dropdown-списки), а `Create/Update/Delete` — результат выполнения команды
 
-### 6.2 Создание моделей запросов и ответов
+
 
 **Файл**: `src/Blog/Services/Models/EntityName.cs`
 
@@ -250,7 +282,7 @@ public class ServiceEntityName : IServiceEntityName
 
         try
         {
-            var relatedEntities = await unitOfWork.RelatedEntities.GetListAsync(cancellationToken);
+            var relatedEntities = await unitOfWork.RelatedEntities.GetListAsync(options: null, cancellationToken: cancellationToken);
             var relatedEntityDropdownItems = relatedEntities.Select(relatedEntity => new EntityNameRelatedEntityDropdownItem
             {
                 Id = relatedEntity.Id,
@@ -315,7 +347,7 @@ public class ServiceEntityName : IServiceEntityName
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
 
-            var relatedEntities = await unitOfWork.RelatedEntities.GetListAsync(cancellationToken);
+            var relatedEntities = await unitOfWork.RelatedEntities.GetListAsync(options: null, cancellationToken: cancellationToken);
             var relatedEntityDropdownItems = relatedEntities.Select(relatedEntity => new EntityNameRelatedEntityDropdownItem
             {
                 Id = relatedEntity.Id,
@@ -349,7 +381,7 @@ public class ServiceEntityName : IServiceEntityName
         var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, cancellationToken);
+            var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, cancellationToken: cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
@@ -381,7 +413,7 @@ public class ServiceEntityName : IServiceEntityName
 
         try
         {
-            var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, cancellationToken);
+            var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, cancellationToken: cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
@@ -410,7 +442,7 @@ public class ServiceEntityName : IServiceEntityName
         var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, cancellationToken);
+            var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, cancellationToken: cancellationToken);
 
             if (model == default)
                 throw new NotFoundException($"{EntityNameTexts.Messages.Error.NotFoundById} : {request.Id}");
@@ -477,7 +509,7 @@ public class ServiceEntityName : IServiceEntityName
 
         try
         {
-            var entityNameQueryOptions = new EntityNameQueryOptions { OrderByNameAsc = true, IncludeRelatedEntities = true };
+            var entityNameQueryOptions = new EntityNameQueryOptions { IncludeRelatedEntities = true };
             var models = await unitOfWork.EntityNames.GetListAsync(entityNameQueryOptions, cancellationToken);
 
             var entityNames = models.Select(model => new EntityNameListModel
@@ -514,8 +546,7 @@ public class ServiceEntityName : IServiceEntityName
 
         try
         {
-            var relatedEntityQueryOptions = new RelatedEntityQueryOptions { OrderByNameAsc = true };
-            var models = await unitOfWork.RelatedEntities.GetListAsync(relatedEntityQueryOptions, cancellationToken);
+            var models = await unitOfWork.RelatedEntities.GetListAsync(options: null, cancellationToken: cancellationToken);
             var relatedEntityDropdownItems = models.Select(model => new EntityNameRelatedEntityDropdownItem
             {
                 Id = model.Id,
