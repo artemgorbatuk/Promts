@@ -69,7 +69,7 @@
 **Файл**: `src/Blog/Repositories.Ef/Options/EntityNameOptions.cs`
 
 ```csharp
-using Repositories.Ef.Ordering;
+using Repositories.Ef.QueryPipeline;
 
 namespace Repositories.Ef.Options;
 
@@ -78,15 +78,268 @@ public class EntityNameQueryOptions
     public bool IncludeRelatedEntities { get; set; }
 
     public OrderParameters<EntityName>? OrderParameters { get; set; }
-
-    public string? Query { get; set; }
-    public int Skip { get; set; }
-    public int Take { get; set; }
+    public SearchParameters<EntityName>? SearchParameters { get; set; }
+    public FilterParameters<EntityName>? FilterParameters { get; set; }
+    public PaginationParameters? PaginationParameters { get; set; }
 }
 
 public class EntityNameCommandOptions
 {
     public IEnumerable<int>? RelatedEntityIds { get; set; }
+}
+```
+
+### QueryPipeline ядро репозитория (поиск/фильтрация/сортировка/пагинация)
+
+Эти классы реализуются **один раз на проект** в `Repositories.Ef/QueryPipeline` и используются всеми репозиториями через `*QueryOptions`.
+
+**Файл**: `src/Blog/Repositories.Ef/QueryPipeline/PaginationParameters.cs`
+
+```csharp
+namespace Repositories.Ef.QueryPipeline;
+
+public class PaginationParameters
+{
+    public int? Skip { get; set; }
+    public int? Take { get; set; }
+
+    public PaginationParameters(int? skip = null, int? take = null)
+    {
+        Skip = skip;
+        Take = take;
+    }
+
+    public IQueryable<TModel> ApplyPagination<TModel>(IQueryable<TModel> query) where TModel : class
+    {
+        if (Skip.HasValue)
+        {
+            query = query.Skip(Skip.Value);
+        }
+
+        if (Take.HasValue)
+        {
+            query = query.Take(Take.Value);
+        }
+
+        return query;
+    }
+}
+```
+
+**Файл**: `src/Blog/Repositories.Ef/QueryPipeline/OrderParameters.cs`
+
+```csharp
+using System.Linq.Expressions;
+
+namespace Repositories.Ef.QueryPipeline;
+
+public class OrderParameters<TModel> where TModel : class
+{
+    public List<(Expression<Func<TModel, object>> KeySelector, bool IsDescending, bool afterTake)> OrderColumns { get; set; }
+
+    public OrderParameters(params (Expression<Func<TModel, object>> KeySelector, bool IsDescending, bool afterTake)[] orderColumns)
+    {
+        OrderColumns = [.. orderColumns];
+    }
+
+    public OrderParameters(params (Expression<Func<TModel, object>> KeySelector, bool IsDescending)[] orderColumns)
+    {
+        OrderColumns = [.. orderColumns.Select(p => (p.KeySelector, p.IsDescending, false))];
+    }
+
+    public OrderParameters(params Expression<Func<TModel, object>>[] orderColumns)
+    {
+        OrderColumns = [.. orderColumns.Select(keySelector => (keySelector, false, false))];
+    }
+
+    public void AddSortColumn(Expression<Func<TModel, object>> keySelector, bool isDescending = false, bool afterTake = false)
+    {
+        OrderColumns.Add((keySelector, isDescending, afterTake));
+    }
+
+    public IOrderedQueryable<TModel> ApplySorting(IQueryable<TModel> query, bool afterTake = false)
+    {
+        var tempOrderColumns = OrderColumns.Where(p => p.afterTake == afterTake);
+
+        var firstColumn = tempOrderColumns.FirstOrDefault();
+
+        if (firstColumn == default)
+        {
+            return (IOrderedQueryable<TModel>)query;
+        }
+
+        var orderedQuery = firstColumn.IsDescending
+            ? query.OrderByDescending(firstColumn.KeySelector)
+            : query.OrderBy(firstColumn.KeySelector);
+
+        foreach (var orderColumn in tempOrderColumns.Skip(1))
+        {
+            var keySelector = orderColumn.KeySelector;
+
+            orderedQuery = orderColumn.IsDescending
+                ? orderedQuery.ThenByDescending(keySelector)
+                : orderedQuery.ThenBy(keySelector);
+        }
+
+        return orderedQuery;
+    }
+}
+```
+
+**Файл**: `src/Blog/Repositories.Ef/QueryPipeline/FilterParameters.cs`
+
+```csharp
+using System.Linq.Expressions;
+
+namespace Repositories.Ef.QueryPipeline;
+
+public class FilterParameters<TModel> where TModel : class
+{
+    public List<FilterColumn<TModel>> FilterColumns { get; set; }
+
+    public string? Condition { get; set; }
+
+    public FilterParameters(params Expression<Func<TModel, bool>>[] filterColumns)
+    {
+        FilterColumns = [.. filterColumns.Select(filter => new FilterColumn<TModel>(filter, null))];
+    }
+
+    public void AddFilterColumn(Expression<Func<TModel, bool>> predicate)
+    {
+        FilterColumns.Add(new FilterColumn<TModel>(predicate, null));
+    }
+
+    public void AddFilterColumn(Expression<Func<TModel, bool>> predicate, string? condition)
+    {
+        FilterColumns.Add(new FilterColumn<TModel>(predicate, NormalizeCondition(condition)));
+    }
+
+    public IQueryable<TModel> ApplyFiltering(IQueryable<TModel> query)
+    {
+        if (FilterColumns.Count == 0)
+        {
+            return query;
+        }
+
+        var defaultCondition = NormalizeCondition(Condition);
+
+        var predicate = FilterColumns[0].Predicate;
+
+        foreach (var filter in FilterColumns.Skip(1))
+        {
+            var isOr = string.Equals(filter.Condition ?? defaultCondition, "or", StringComparison.OrdinalIgnoreCase);
+            predicate = Combine(predicate, filter.Predicate, isOr);
+        }
+
+        return query.Where(predicate);
+    }
+
+    private static Expression<Func<TModel, bool>> Combine(Expression<Func<TModel, bool>> left, Expression<Func<TModel, bool>> right, bool isOr)
+    {
+        var parameter = Expression.Parameter(typeof(TModel));
+        var leftBody = new ReplaceParameterVisitor(left.Parameters[0], parameter).Visit(left.Body);
+        var rightBody = new ReplaceParameterVisitor(right.Parameters[0], parameter).Visit(right.Body);
+
+        var body = isOr
+            ? Expression.OrElse(leftBody!, rightBody!)
+            : Expression.AndAlso(leftBody!, rightBody!);
+
+        return Expression.Lambda<Func<TModel, bool>>(body, parameter);
+    }
+
+    private static string NormalizeCondition(string? condition)
+    {
+        return string.Equals(condition, "or", StringComparison.OrdinalIgnoreCase) ? "or" : "and";
+    }
+
+    public record FilterColumn<TFilter>(
+        Expression<Func<TFilter, bool>> Predicate,
+        string? Condition) where TFilter : class;
+
+    private sealed class ReplaceParameterVisitor : ExpressionVisitor
+    {
+        private readonly ParameterExpression source;
+        private readonly ParameterExpression target;
+
+        public ReplaceParameterVisitor(ParameterExpression source, ParameterExpression target)
+        {
+            this.source = source;
+            this.target = target;
+        }
+
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            return node == source ? target : base.VisitParameter(node);
+        }
+    }
+}
+```
+
+**Файл**: `src/Blog/Repositories.Ef/QueryPipeline/SearchParameters.cs`
+
+```csharp
+using System.Linq.Expressions;
+
+namespace Repositories.Ef.QueryPipeline;
+
+public class SearchParameters<TModel> where TModel : class
+{
+    public List<Expression<Func<TModel, bool>>> SearchColumns { get; set; }
+
+    public SearchParameters(params Expression<Func<TModel, bool>>[] searchColumns)
+    {
+        SearchColumns = [.. searchColumns];
+    }
+
+    public void AddSearchColumn(Expression<Func<TModel, bool>> predicate)
+    {
+        SearchColumns.Add(predicate);
+    }
+
+    public IQueryable<TModel> ApplySearching(IQueryable<TModel> query)
+    {
+        if (SearchColumns.Count == 0)
+        {
+            return query;
+        }
+
+        var predicate = SearchColumns[0];
+
+        foreach (var searchColumn in SearchColumns.Skip(1))
+        {
+            predicate = Combine(predicate, searchColumn);
+        }
+
+        return query.Where(predicate);
+    }
+
+    private static Expression<Func<TModel, bool>> Combine(Expression<Func<TModel, bool>> left, Expression<Func<TModel, bool>> right)
+    {
+        var parameter = Expression.Parameter(typeof(TModel));
+        var leftBody = new ReplaceParameterVisitor(left.Parameters[0], parameter).Visit(left.Body);
+        var rightBody = new ReplaceParameterVisitor(right.Parameters[0], parameter).Visit(right.Body);
+
+        var body = Expression.AndAlso(leftBody!, rightBody!);
+
+        return Expression.Lambda<Func<TModel, bool>>(body, parameter);
+    }
+
+    private sealed class ReplaceParameterVisitor : ExpressionVisitor
+    {
+        private readonly ParameterExpression source;
+        private readonly ParameterExpression target;
+
+        public ReplaceParameterVisitor(ParameterExpression source, ParameterExpression target)
+        {
+            this.source = source;
+            this.target = target;
+        }
+
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            return node == source ? target : base.VisitParameter(node);
+        }
+    }
 }
 ```
 
@@ -99,6 +352,7 @@ using Datasource.Ef.Contexts;
 using Datasource.Ef.Models;
 using Microsoft.EntityFrameworkCore;
 using Repositories.Ef.Options;
+using Repositories.Ef.QueryPipeline;
 
 namespace Repositories.Ef.Api;
 
@@ -111,6 +365,7 @@ public interface IRepositoryEntityName
     EntityName GetNew();
 
     Task<EntityName?> GetSingleOrDefaultAsync(int id, EntityNameQueryOptions? options = null, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(EntityNameQueryOptions? options = null, CancellationToken cancellationToken = default);
     Task<IEnumerable<EntityName>> GetListAsync(EntityNameQueryOptions? options = null, CancellationToken cancellationToken = default);
 }
 
@@ -177,6 +432,23 @@ public class RepositoryEntityName : IRepositoryEntityName
         return await query.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
+    public async Task<int> CountAsync(EntityNameQueryOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        var query = context.EntityNames.AsNoTracking();
+
+        if (options?.SearchParameters?.SearchColumns != null && options.SearchParameters.SearchColumns.Count > 0)
+        {
+            query = options.SearchParameters.ApplySearching(query);
+        }
+
+        if (options?.FilterParameters?.FilterColumns != null && options.FilterParameters.FilterColumns.Count > 0)
+        {
+            query = options.FilterParameters.ApplyFiltering(query);
+        }
+
+        return await query.CountAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<EntityName>> GetListAsync(EntityNameQueryOptions? options = null, CancellationToken cancellationToken = default)
     {
         var query = context.EntityNames.AsNoTracking();
@@ -186,10 +458,14 @@ public class RepositoryEntityName : IRepositoryEntityName
             query = query.Include(p => p.RelatedEntities);
         }
 
-        if (!string.IsNullOrWhiteSpace(options?.Query))
+        if (options?.SearchParameters?.SearchColumns != null && options.SearchParameters.SearchColumns.Count > 0)
         {
-            var lowerQuery = options.Query.ToLowerInvariant();
-            query = query.Where(p => p.Name.ToLower().Contains(lowerQuery));
+            query = options.SearchParameters.ApplySearching(query);
+        }
+
+        if (options?.FilterParameters?.FilterColumns != null && options.FilterParameters.FilterColumns.Count > 0)
+        {
+            query = options.FilterParameters.ApplyFiltering(query);
         }
 
         if (options?.OrderParameters?.OrderColumns != null && options.OrderParameters.OrderColumns.Count > 0)
@@ -197,12 +473,14 @@ public class RepositoryEntityName : IRepositoryEntityName
             query = options.OrderParameters.ApplySorting(query, false);
         }
 
-        if (options != null)
+        if (options?.PaginationParameters != null)
         {
-            var safeSkip = Math.Max(0, options.Skip);
-            var safeTake = Math.Clamp(options.Take <= 0 ? 50 : options.Take, 1, 200);
+            query = options.PaginationParameters.ApplyPagination(query);
+        }
 
-            query = query.Skip(safeSkip).Take(safeTake);
+        if (options?.OrderParameters?.OrderColumns != null && options.OrderParameters.OrderColumns.Count > 0)
+        {
+            query = options.OrderParameters.ApplySorting(query, true);
         }
 
         return await query.ToListAsync(cancellationToken);
@@ -265,9 +543,11 @@ catch
 
 **Файл**: `src/Blog/Client/Middleware/ServiceRegistration.cs`
 
-Добавить в метод `AddDependencyInjectionExt`:
+Добавить в метод `AddDependencyInjectionExt` (при необходимости добавить `using Datasource.Ef.Models;` и `using Services.QueryPipeline;`):
 
 ```csharp
 services.AddScoped<IRepositoryEntityName, RepositoryEntityName>();
 services.AddScoped<IUnitOfWork, UnitOfWork>();
+services.AddScoped<IEntityFieldSelectors<EntityName>, EntityNameFieldSelectors>();
+services.AddScoped<IEntityNameQueryPipelineValidator, EntityNameQueryPipelineValidator>();
 ```

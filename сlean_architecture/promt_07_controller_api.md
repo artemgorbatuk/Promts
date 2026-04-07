@@ -119,9 +119,9 @@ public class EntityNamesController : ControllerBase
         return Ok(response);
     }
 
-    [HttpGet]
+    [HttpPost("list")]
     [ProducesResponseType(typeof(EntityNameDisplayListResponse), StatusCodes.Status200OK)]
-    public async Task<ActionResult<EntityNameDisplayListResponse>> DisplayListAsync([FromQuery] EntityNameListRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<EntityNameDisplayListResponse>> DisplayListAsync([FromBody] EntityNameListRequest request, CancellationToken cancellationToken)
     {
         var response = await service.DisplayListAsync(request, cancellationToken);
         return Ok(response);

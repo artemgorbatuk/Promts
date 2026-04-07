@@ -21,6 +21,18 @@
 - Опции репозиториев — классы `QueryOptions`/`CommandOptions` в `Repositories.Ef/Options`, задают параметры чтения (включая загрузку связей) и правила обновления связей в командах
 - Модели сервисного слоя (DTO) — классы запросов/ответов для UI/API в `Services/Models`, не должны требовать знания EF и `DbContext`
 
+### QueryPipeline (поиск/фильтрация/сортировка/пагинация)
+
+- QueryPipeline — общий механизм для “грязных” пользовательских параметров (поиск/фильтр/сортировка/пагинация), который:
+  - живёт в `Services/QueryPipeline` (валидация входных полей/операторов и построение выражений)
+  - применяется в `Repositories.Ef/QueryPipeline` (ApplySearching/ApplyFiltering/ApplySorting/ApplyPagination к `IQueryable`)
+  - передаётся через `Repositories.Ef/Options/*QueryOptions` (SearchParameters/FilterParameters/OrderParameters/PaginationParameters)
+- UI-специфичные адаптеры (например, Syncfusion `DataManagerRequest`) не являются частью QueryPipeline ядра и не должны попадать в “чистые” проекты
+- Для list-эндпоинтов, которые принимают коллекции фильтров/сортировок, предпочтителен `POST /list` с `[FromBody]`, а не `GET` с `[FromQuery]`
+- При переносе QueryPipeline обязательно учесть:
+  - `FieldType.Boolean` должен быть реализован в `FilterParametersBuilder`
+  - если используется фильтрация по списку дат (`in/notin`), эти операторы должны быть разрешены в `QueryPipelineOperators.FilterOperators`
+
 ### Связи и связанные поля (общие определения)
 
 - **FK (`...Id` / `...Ids`)**: хранит “ссылку” на связанную сущность через её первичный ключ
@@ -42,10 +54,12 @@ src/ProjectName/
 │   └── Migrations/       ## Миграции БД
 ├── Repositories.Ef/      # Слой репозиториев
 │   ├── Api/              ## Интерфейсы и реализации
+│   ├── QueryPipeline/    ## Применение search/filter/order/pagination к IQueryable
 │   └── Options/          ## Опции запросов
 ├── Services/             # Слой сервисов
 │   ├── Api/              ## Интерфейсы и реализации сервисов
 │   ├── Models/           ## Модели запросов/ответов
+│   ├── QueryPipeline/    ## Валидация и построение Search/Filter/Order/Pagination параметров
 │   └── Texts/            ## Текстовые константы
 └── Client/               # Слой представления
     ├── Controllers/      ## Контроллеры MVC

@@ -12,7 +12,7 @@
   - модели: `EntityName{Operation}Request/Response` и `EntityNameDisplay{Operation}Request/Response` (как в примере ниже)
 - DI:
   - сервис регистрировать как `AddScoped<IServiceEntityName, ServiceEntityName>()`
-  - сервис получает зависимости через конструктор: `IUnitOfWork` и `ILogger<ServiceEntityName>`
+  - сервис получает зависимости через конструктор: `IUnitOfWork`, `ILogger<ServiceEntityName>`, `IEntityNameQueryPipelineValidator`, `IEntityFieldSelectors<EntityName>`
 - Асинхронность и отмена:
   - все публичные методы сервиса асинхронные и принимают `CancellationToken cancellationToken` (передавать дальше во все `...Async`)
 - Транзакции и коммит:
@@ -41,6 +41,8 @@
 **Файл**: `src/Blog/Services/Models/EntityName.cs`
 
 ```csharp
+using Services.Models.QueryPipeline;
+
 namespace Services.Models;
 
 // === CREATE ===
@@ -130,7 +132,10 @@ public class EntityNameDisplayInfoResponse
 // === LIST ===
 public class EntityNameListRequest
 {
-	// Может содержать параметры для фильтрации и пагинации
+	public ICollection<SearchField>? SearchFields { get; set; }
+	public ICollection<FilterField>? FilterFields { get; set; }
+	public ICollection<OrderField>? OrderFields { get; set; }
+	public PaginationField? PaginationField { get; set; }
 }
 
 public class EntityNameDisplayListResponse
@@ -165,6 +170,538 @@ public class EntityNameRelatedEntityDropdownItem
 {
 	public required int Id { get; set; }
 	public required string Name { get; set; }
+}
+```
+
+### 6.2.0 QueryPipeline ядро (общие файлы)
+
+Эти классы создаются **один раз на проект** и используются всеми сущностями.
+
+#### DTO-модели QueryPipeline
+
+**Папка**: `src/Blog/Services/Models/QueryPipeline/`
+
+**Файл**: `src/Blog/Services/Models/QueryPipeline/SearchField.cs`
+
+```csharp
+namespace Services.Models.QueryPipeline;
+
+public record SearchField(
+    ICollection<string> Fields,
+    string Key,
+    string Operator);
+```
+
+**Файл**: `src/Blog/Services/Models/QueryPipeline/FilterField.cs`
+
+```csharp
+namespace Services.Models.QueryPipeline;
+
+public record FilterField(
+    string Field,
+    string Operator,
+    string? Condition,
+    object? Value,
+    bool? IgnoreCase);
+```
+
+**Файл**: `src/Blog/Services/Models/QueryPipeline/OrderField.cs`
+
+```csharp
+namespace Services.Models.QueryPipeline;
+
+public record OrderField(
+    string Field,
+    string Direction,
+    bool AfterTake);
+```
+
+**Файл**: `src/Blog/Services/Models/QueryPipeline/PaginationField.cs`
+
+```csharp
+namespace Services.Models.QueryPipeline;
+
+public record PaginationField(
+    int? Skip,
+    int? Take);
+```
+
+#### Сервисный слой QueryPipeline (валидация и билдеры)
+
+**Папка**: `src/Blog/Services/QueryPipeline/`
+
+**Файл**: `src/Blog/Services/QueryPipeline/QueryPipelineOperators.cs`
+
+```csharp
+namespace Services.QueryPipeline;
+
+public static class QueryPipelineOperators
+{
+    public static readonly IReadOnlySet<string> SearchOperators = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "contains",
+        "startswith",
+        "endswith"
+    };
+
+    public static readonly IReadOnlySet<string> FilterOperators = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "eq",
+        "equal",
+        "notequal",
+        "greaterthan",
+        "greaterthanorequal",
+        "lessthan",
+        "lessthanorequal",
+        "contains",
+        "doesnotcontain",
+        "startswith",
+        "endswith",
+        "isnull",
+        "isnotnull",
+        "isempty",
+        "isnotempty",
+        "in",
+        "notin"
+    };
+
+    public static readonly IReadOnlySet<string> OrderDirections = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "asc",
+        "ascending",
+        "desc",
+        "descending"
+    };
+}
+```
+
+**Файл**: `src/Blog/Services/QueryPipeline/IEntityFieldSelectors.cs`
+
+```csharp
+using System.Linq.Expressions;
+
+namespace Services.QueryPipeline;
+
+public enum FieldType
+{
+    String,
+    Number,
+    DateTime,
+    Boolean,
+    Guid
+}
+
+public interface IEntityFieldSelectors<TEntity>
+{
+    Expression<Func<TEntity, string?>>? GetSearchSelector(string fieldName);
+    (Expression<Func<TEntity, object>>? Selector, FieldType Type) GetFilterSelector(string fieldName);
+    Expression<Func<TEntity, object>>? GetOrderSelector(string fieldName);
+}
+```
+
+**Файл**: `src/Blog/Services/QueryPipeline/IQueryPipelineFieldMap.cs`
+
+```csharp
+namespace Services.QueryPipeline;
+
+public interface IQueryPipelineFieldMap
+{
+    IReadOnlySet<string> SearchFields { get; }
+    IReadOnlySet<string> FilterFields { get; }
+    IReadOnlySet<string> OrderFields { get; }
+    IReadOnlySet<string> SearchOperators { get; }
+    IReadOnlySet<string> FilterOperators { get; }
+    IReadOnlySet<string> OrderDirections { get; }
+}
+```
+
+**Файл**: `src/Blog/Services/QueryPipeline/IQueryPipelineValidator.cs`
+
+```csharp
+using Services.Models.QueryPipeline;
+
+namespace Services.QueryPipeline;
+
+public interface IQueryPipelineValidator
+{
+    void Validate(
+        ICollection<SearchField>? searchFields,
+        ICollection<FilterField>? filterFields,
+        ICollection<OrderField>? orderFields);
+
+    void ValidateSearch(ICollection<SearchField>? searchFields);
+    void ValidateFilter(ICollection<FilterField>? filterFields);
+    void ValidateOrder(ICollection<OrderField>? orderFields);
+}
+```
+
+**Файл**: `src/Blog/Services/QueryPipeline/QueryPipelineValidator.cs`
+
+```csharp
+using Services.Exceptions;
+using Services.Models.QueryPipeline;
+
+namespace Services.QueryPipeline;
+
+public class QueryPipelineValidator : IQueryPipelineValidator
+{
+    private readonly IQueryPipelineFieldMap fieldMap;
+
+    public QueryPipelineValidator(IQueryPipelineFieldMap fieldMap)
+    {
+        this.fieldMap = fieldMap ?? throw new ArgumentNullException(nameof(fieldMap));
+    }
+
+    public void Validate(
+        ICollection<SearchField>? searchFields,
+        ICollection<FilterField>? filterFields,
+        ICollection<OrderField>? orderFields)
+    {
+        ValidateSearch(searchFields);
+        ValidateFilter(filterFields);
+        ValidateOrder(orderFields);
+    }
+
+    public void ValidateSearch(ICollection<SearchField>? searchFields)
+    {
+        if (searchFields == null || searchFields.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var searchField in searchFields)
+        {
+            if (searchField.Fields == null || searchField.Fields.Count == 0)
+            {
+                throw new BadRequestException("Поле поиска должно включать хотя бы одно поле.");
+            }
+
+            foreach (var field in searchField.Fields)
+            {
+                if (!fieldMap.SearchFields.Contains(field))
+                {
+                    throw new BadRequestException($"Неизвестное поле поиска: {field}.");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchField.Operator)
+                && !fieldMap.SearchOperators.Contains(searchField.Operator))
+            {
+                throw new BadRequestException($"Неизвестный оператор поиска: {searchField.Operator}.");
+            }
+        }
+    }
+
+    public void ValidateFilter(ICollection<FilterField>? filterFields)
+    {
+        if (filterFields == null || filterFields.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var filterField in filterFields)
+        {
+            if (string.IsNullOrWhiteSpace(filterField.Field))
+            {
+                throw new BadRequestException("Поле фильтра обязательно.");
+            }
+
+            if (!fieldMap.FilterFields.Contains(filterField.Field))
+            {
+                throw new BadRequestException($"Неизвестное поле фильтра: {filterField.Field}.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(filterField.Operator)
+                && !fieldMap.FilterOperators.Contains(filterField.Operator))
+            {
+                throw new BadRequestException($"Неизвестный оператор фильтра: {filterField.Operator}.");
+            }
+        }
+    }
+
+    public void ValidateOrder(ICollection<OrderField>? orderFields)
+    {
+        if (orderFields == null || orderFields.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var orderField in orderFields)
+        {
+            if (string.IsNullOrWhiteSpace(orderField.Field))
+            {
+                throw new BadRequestException("Поле сортировки обязательно.");
+            }
+
+            if (!fieldMap.OrderFields.Contains(orderField.Field))
+            {
+                throw new BadRequestException($"Неизвестное поле сортировки: {orderField.Field}.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(orderField.Direction)
+                && !fieldMap.OrderDirections.Contains(orderField.Direction))
+            {
+                throw new BadRequestException($"Неизвестное направление сортировки: {orderField.Direction}.");
+            }
+        }
+    }
+}
+```
+
+**Файл**: `src/Blog/Services/QueryPipeline/PaginationParametersBuilder.cs`
+
+```csharp
+using Repositories.Ef.QueryPipeline;
+using Services.Models.QueryPipeline;
+
+namespace Services.QueryPipeline;
+
+public static class PaginationParametersBuilder
+{
+    public static PaginationParameters? Build(PaginationField? paginationField)
+    {
+        if (paginationField == null || (paginationField.Skip == null && paginationField.Take == null))
+        {
+            return null;
+        }
+
+        return new PaginationParameters(paginationField.Skip, paginationField.Take);
+    }
+}
+```
+
+**Файл**: `src/Blog/Services/QueryPipeline/SearchParametersBuilder.cs`
+
+Перенести “как есть” из FlightChat:  
+`FlightChatApp/Services/QueryPipeline/SearchParametersBuilder.cs`
+
+**Файл**: `src/Blog/Services/QueryPipeline/OrderParametersBuilder.cs`
+
+Перенести “как есть” из FlightChat:  
+`FlightChatApp/Services/QueryPipeline/OrderParametersBuilder.cs`
+
+**Файл**: `src/Blog/Services/QueryPipeline/FilterParametersBuilder.cs`
+
+Перенести “как есть” из FlightChat:  
+`FlightChatApp/Services/QueryPipeline/FilterParametersBuilder.cs`  
+Дополнительно учесть блоки для `FieldType.Boolean` и `TryGetBool/AddBoolFilter` (см. ниже в этом promt).
+
+### 6.2.1 QueryPipeline для списка (поиск/фильтр/сортировка/пагинация)
+
+Нужно добавить в `Services/QueryPipeline` сущностно-специфичные классы:
+
+**Файл**: `src/Blog/Services/QueryPipeline/EntityNameFieldSelectors.cs`
+
+```csharp
+using Datasource.Ef.Models;
+using System.Linq.Expressions;
+
+namespace Services.QueryPipeline;
+
+public class EntityNameFieldSelectors : IEntityFieldSelectors<EntityName>
+{
+    public Expression<Func<EntityName, string?>>? GetSearchSelector(string fieldName)
+    {
+        return fieldName?.ToLowerInvariant() switch
+        {
+            "name" => x => x.Name,
+            _ => null
+        };
+    }
+
+    public (Expression<Func<EntityName, object>>? Selector, FieldType Type) GetFilterSelector(string fieldName)
+    {
+        return fieldName?.ToLowerInvariant() switch
+        {
+            "id" => (x => x.Id, FieldType.Number),
+            "name" => (x => x.Name, FieldType.String),
+            _ => (null, FieldType.String)
+        };
+    }
+
+    public Expression<Func<EntityName, object>>? GetOrderSelector(string fieldName)
+    {
+        return fieldName?.ToLowerInvariant() switch
+        {
+            "id" => x => x.Id,
+            "name" => x => x.Name,
+            _ => null
+        };
+    }
+}
+```
+
+**Файл**: `src/Blog/Services/QueryPipeline/EntityNameFieldMap.cs`
+
+```csharp
+namespace Services.QueryPipeline;
+
+public static class EntityNameFieldMap
+{
+    public static readonly IReadOnlySet<string> SearchFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "name"
+    };
+
+    public static readonly IReadOnlySet<string> FilterFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "id",
+        "name"
+    };
+
+    public static readonly IReadOnlySet<string> OrderFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "id",
+        "name"
+    };
+
+    public static IReadOnlySet<string> SearchOperators => QueryPipelineOperators.SearchOperators;
+    public static IReadOnlySet<string> FilterOperators => QueryPipelineOperators.FilterOperators;
+    public static IReadOnlySet<string> OrderDirections => QueryPipelineOperators.OrderDirections;
+}
+
+public class EntityNameFieldMapAdapter : IQueryPipelineFieldMap
+{
+    public IReadOnlySet<string> SearchFields => EntityNameFieldMap.SearchFields;
+    public IReadOnlySet<string> FilterFields => EntityNameFieldMap.FilterFields;
+    public IReadOnlySet<string> OrderFields => EntityNameFieldMap.OrderFields;
+    public IReadOnlySet<string> SearchOperators => EntityNameFieldMap.SearchOperators;
+    public IReadOnlySet<string> FilterOperators => EntityNameFieldMap.FilterOperators;
+    public IReadOnlySet<string> OrderDirections => EntityNameFieldMap.OrderDirections;
+}
+```
+
+**Файл**: `src/Blog/Services/QueryPipeline/EntityNameQueryPipelineValidator.cs`
+
+```csharp
+namespace Services.QueryPipeline;
+
+public interface IEntityNameQueryPipelineValidator : IQueryPipelineValidator
+{
+}
+
+public class EntityNameQueryPipelineValidator : QueryPipelineValidator, IEntityNameQueryPipelineValidator
+{
+    public EntityNameQueryPipelineValidator() : base(new EntityNameFieldMapAdapter())
+    {
+    }
+}
+```
+
+Нюансы при переносе QueryPipeline ядра:
+- `FieldType.Boolean` должен быть реализован в `FilterParametersBuilder`
+- если используется фильтрация по списку дат (`in/notin`), эти операторы должны быть разрешены в `QueryPipelineOperators.FilterOperators`
+
+Минимальные правки:
+
+**Файл**: `src/Blog/Services/QueryPipeline/QueryPipelineOperators.cs`
+
+```csharp
+public static readonly IReadOnlySet<string> FilterOperators = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+{
+    "eq",
+    "equal",
+    "notequal",
+    "greaterthan",
+    "greaterthanorequal",
+    "lessthan",
+    "lessthanorequal",
+    "contains",
+    "doesnotcontain",
+    "startswith",
+    "endswith",
+    "isnull",
+    "isnotnull",
+    "isempty",
+    "isnotempty",
+    "in",
+    "notin"
+};
+```
+
+**Файл**: `src/Blog/Services/QueryPipeline/FilterParametersBuilder.cs`
+
+```csharp
+case FieldType.Boolean:
+    if (TryGetBool(value, out var boolValue))
+    {
+        AddBoolFilter(filterParameters, selector, op, boolValue, condition);
+    }
+    break;
+
+private static void AddBoolFilter(
+    FilterParameters<TEntity> filterParameters,
+    Expression<Func<TEntity, object>> selector,
+    string op,
+    bool value,
+    string? condition)
+{
+    var parameter = selector.Parameters[0];
+    var body = selector.Body;
+
+    if (body is UnaryExpression { NodeType: ExpressionType.Convert } unary)
+    {
+        body = unary.Operand;
+    }
+
+    var valueConstant = Expression.Constant(value, body.Type);
+
+    Expression? bodyExpression = op switch
+    {
+        "eq" or "equal" => Expression.Equal(body, valueConstant),
+        "notequal" => Expression.NotEqual(body, valueConstant),
+        _ => null
+    };
+
+    if (bodyExpression == null)
+    {
+        return;
+    }
+
+    filterParameters.AddFilterColumn(Expression.Lambda<Func<TEntity, bool>>(bodyExpression, parameter), condition);
+}
+
+private static bool TryGetBool(object? value, out bool result)
+{
+    if (value is bool boolValue)
+    {
+        result = boolValue;
+        return true;
+    }
+
+    if (value is JsonElement jsonElement)
+    {
+        if (jsonElement.ValueKind == JsonValueKind.True)
+        {
+            result = true;
+            return true;
+        }
+
+        if (jsonElement.ValueKind == JsonValueKind.False)
+        {
+            result = false;
+            return true;
+        }
+
+        if (jsonElement.ValueKind == JsonValueKind.String)
+        {
+            var text = jsonElement.GetString();
+            if (bool.TryParse(text, out var parsed))
+            {
+                result = parsed;
+                return true;
+            }
+        }
+    }
+
+    if (value is string stringValue && bool.TryParse(stringValue, out var parsedBool))
+    {
+        result = parsedBool;
+        return true;
+    }
+
+    result = default;
+    return false;
 }
 ```
 
@@ -236,9 +773,12 @@ public static class EntityNameTexts
 
 ```csharp
 using System.Threading;
+using Datasource.Ef.Models;
 using Microsoft.Extensions.Logging;
 using Repositories.Ef.Api;
 using Repositories.Ef.Options;
+using Repositories.Ef.QueryPipeline;
+using Services.QueryPipeline;
 using Services.Texts;
 using Services.Exceptions;
 using Services.Models;
@@ -269,11 +809,15 @@ public class ServiceEntityName : IServiceEntityName
 {
     private readonly IUnitOfWork unitOfWork;
     private readonly ILogger<ServiceEntityName> logger;
+    private readonly IEntityNameQueryPipelineValidator queryPipelineValidator;
+    private readonly IEntityFieldSelectors<EntityName> fieldSelectors;
 
-    public ServiceEntityName(IUnitOfWork unitOfWork, ILogger<ServiceEntityName> logger)
+    public ServiceEntityName(IUnitOfWork unitOfWork, ILogger<ServiceEntityName> logger, IEntityNameQueryPipelineValidator queryPipelineValidator, IEntityFieldSelectors<EntityName> fieldSelectors)
     {
         this.unitOfWork = unitOfWork;
         this.logger = logger;
+        this.queryPipelineValidator = queryPipelineValidator;
+        this.fieldSelectors = fieldSelectors;
     }
 
     public async Task<EntityNameDisplayCreateResponse> DisplayCreateAsync(CancellationToken cancellationToken)
@@ -509,8 +1053,30 @@ public class ServiceEntityName : IServiceEntityName
 
         try
         {
-            var entityNameQueryOptions = new EntityNameQueryOptions { IncludeRelatedEntities = true };
-            var models = await unitOfWork.EntityNames.GetListAsync(entityNameQueryOptions, cancellationToken);
+            queryPipelineValidator.Validate(request.SearchFields, request.FilterFields, request.OrderFields);
+
+            var searchParameters = SearchParametersBuilder<EntityName>.Build(request.SearchFields, fieldSelectors);
+            var filterParameters = FilterParametersBuilder<EntityName>.Build(request.FilterFields, fieldSelectors);
+            var orderParameters = OrderParametersBuilder<EntityName>.Build(request.OrderFields, fieldSelectors);
+            var paginationParameters = PaginationParametersBuilder.Build(request.PaginationField);
+
+            var countOptions = new EntityNameQueryOptions
+            {
+                SearchParameters = searchParameters,
+                FilterParameters = filterParameters
+            };
+
+            var options = new EntityNameQueryOptions
+            {
+                IncludeRelatedEntities = true,
+                SearchParameters = searchParameters,
+                FilterParameters = filterParameters,
+                OrderParameters = orderParameters,
+                PaginationParameters = paginationParameters
+            };
+
+            var total = await unitOfWork.EntityNames.CountAsync(countOptions, cancellationToken);
+            var models = await unitOfWork.EntityNames.GetListAsync(options, cancellationToken);
 
             var entityNames = models.Select(model => new EntityNameListModel
             {
@@ -526,7 +1092,7 @@ public class ServiceEntityName : IServiceEntityName
             var response = new EntityNameDisplayListResponse
             {
                 EntityNames = [.. entityNames],
-                EntityNameCount = entityNames.Count(),
+                EntityNameCount = total,
             };
 
             logger.LogInformation(EntityNameTexts.Messages.Success.DisplayListCompleted);
