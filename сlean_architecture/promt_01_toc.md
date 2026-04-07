@@ -15,18 +15,18 @@
 ### Описание promt файлов
 
 - promt_02_overview.md — Введение, архитектура, технологии, структура проекта, модели (1–12)
-- promt_03_model_configuration_dbcontext.md — Этапы 2–4: Модель, Конфигурация, Контекст
-- promt_04_migration.md — Этап 12: Миграция (создание/применение)
-- promt_05_repository.md — Этап 5: Репозиторий (опции, интерфейс, реализация, DI)
-- promt_06_service.md — Этап 6: Сервис (модели, тексты, интерфейс, реализация, DI)
-- promt_07_controller_api.md — Этап 7: Контроллер (требования, операции, авторизация)
-- promt_08_frontend.md — Этап 8-11: Фронтенд (требования, реализация, DI) [будет позже]
+- promt_04_model_configuration_dbcontext.md — Этапы 2–4: Модель, Конфигурация, Контекст
+- promt_05_migration.md — Этап 12: Миграция (создание/применение)
+- promt_06_repository.md — Этап 5: Репозиторий (опции, интерфейс, реализация, DI)
+- promt_07_service.md — Этап 6: Сервис (модели, тексты, интерфейс, реализация, DI)
+- promt_08_controller_api.md — Этап 7: Контроллер (требования, операции, авторизация)
+- promt_09_frontend.md — Этап 8-11: Фронтенд (требования, реализация, DI) [будет позже]
 
 ### Быстрые ссылки
 
 1. [Обзор и модели](./promt_02_overview.md)
-2. [Модель/Конфигурация/Контекст](./promt_03_model_configuration_dbcontext.md)
-3. [Миграция](./promt_04_migration.md)
-4. [Репозиторий](./promt_05_repository.md)
-5. [Сервис](./promt_06_service.md)
-6. [Контроллер](./promt_07_controller_api.md)
+2. [Модель/Конфигурация/Контекст](./promt_04_model_configuration_dbcontext.md)
+3. [Миграция](./promt_05_migration.md)
+4. [Репозиторий](./promt_06_repository.md)
+5. [Сервис](./promt_07_service.md)
+6. [Контроллер](./promt_08_controller_api.md)
