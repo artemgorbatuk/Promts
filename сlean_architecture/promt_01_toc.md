@@ -15,6 +15,7 @@
 ### Описание promt файлов
 
 - promt_02_overview.md — Введение, архитектура, технологии, структура проекта, модели (1–12)
+- promt_03_requirements.md — Опрос перед реализацией (вопросы по модели/БД/связям/list/DI/миграциям)
 - promt_04_model_configuration_dbcontext.md — Этапы 2–4: Модель, Конфигурация, Контекст
 - promt_05_migration.md — Этап 12: Миграция (создание/применение)
 - promt_06_repository.md — Этап 5: Репозиторий (опции, интерфейс, реализация, DI)
@@ -25,8 +26,9 @@
 ### Быстрые ссылки
 
 1. [Обзор и модели](./promt_02_overview.md)
-2. [Модель/Конфигурация/Контекст](./promt_04_model_configuration_dbcontext.md)
-3. [Миграция](./promt_05_migration.md)
-4. [Репозиторий](./promt_06_repository.md)
-5. [Сервис](./promt_07_service.md)
-6. [Контроллер](./promt_08_controller_api.md)
+2. [Опрос перед реализацией](./promt_03_requirements.md)
+3. [Модель/Конфигурация/Контекст](./promt_04_model_configuration_dbcontext.md)
+4. [Миграция](./promt_05_migration.md)
+5. [Репозиторий](./promt_06_repository.md)
+6. [Сервис](./promt_07_service.md)
+7. [Контроллер](./promt_08_controller_api.md)
