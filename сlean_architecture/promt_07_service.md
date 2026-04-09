@@ -4,9 +4,9 @@
 
 - Сервисный слой реализует бизнес-операции для сущности `EntityName` поверх репозиториев и `IUnitOfWork`, без прямого доступа к `DbContext`
 - Для сервиса должны быть созданы:
-  - DTO-модели запросов/ответов в `src/Blog/Services/Models/EntityName.cs`
-  - класс текстовых констант в `src/Blog/Services/Texts/EntityNameTexts.cs`
-  - интерфейс `IServiceEntityName` и реализация `ServiceEntityName` в `src/Blog/Services/Api/ServiceEntityName.cs`
+  - DTO-модели запросов/ответов в `src/ProjectName/Services/Models/EntityName.cs`
+  - класс текстовых констант в `src/ProjectName/Services/Texts/EntityNameTexts.cs`
+  - интерфейс `IServiceEntityName` и реализация `ServiceEntityName` в `src/ProjectName/Services/Api/ServiceEntityName.cs`
 - Именование:
   - интерфейс: `IServiceEntityName`, реализация: `ServiceEntityName`
   - модели: `EntityName{Operation}Request/Response` и `EntityNameDisplay{Operation}Request/Response` (как в примере ниже)
@@ -25,8 +25,20 @@
   - для команд использовать `CommandOptions` для управления связями (например, `RelatedEntityIds`)
   - детали контрактов репозиториев/`IUnitOfWork`/`QueryOptions`/`CommandOptions` описаны в `promt_06_repository.md`; сервис не должен придумывать новые опции или свойства (например, `OrderByNameAsc`), которых нет в репозиторном промте
   - `Include*` опции добавлять только если у сущности есть соответствующие связи и они реально нужны в текущей операции; если связей несколько — в `QueryOptions` должно быть несколько `Include*` флагов (по одному на каждую связь), как описано в репозиторном промте
+- Валидация входных данных:
+  - если `request == null`, выбрасывать `BadRequestException` с сообщением `EntityNameTexts.Messages.Validation.RequestNull`
+  - если метод принимает `Id` (DisplayUpdate/Update/DisplayDelete/Delete/DisplayInfo), то `Id` должен быть `> 0`, иначе `BadRequestException` с сообщением `EntityNameTexts.Messages.Validation.IdNotValid`
+  - для `Create/Update` поле `Name` не должно быть пустым, иначе `BadRequestException` с сообщением `EntityNameTexts.Messages.Validation.NameEmpty`
+  - для списков id (`...SelectedIds`):
+    - `null` трактовать как пустую коллекцию
+    - если есть элементы `<= 0`, выбрасывать `BadRequestException` с сообщением `EntityNameTexts.Messages.Validation.RelatedEntityIdsNotValid`
+  - для `DisplayList`:
+    - валидировать QueryPipeline через `queryPipelineValidator.Validate(...)` (неизвестные поля/операторы → `BadRequestException`)
+    - валидировать пагинацию (`Skip >= 0`, `Take` в допустимом диапазоне), иначе `BadRequestException` с сообщением `EntityNameTexts.Messages.Validation.PaginationNotValid`
 - Обработка отсутствующих данных:
   - если сущность не найдена, выбрасывать `NotFoundException` с сообщением из `EntityNameTexts.Messages.Error.NotFoundById`
+- Кастомные исключения и глобальный маппинг в Web API:
+  - вынесено в `promt_07_service_exceptions.md`
 - Логирование и тексты:
   - в начале операций логировать `EntityNameTexts.Messages.Start.*`
   - при успешном завершении логировать `EntityNameTexts.Messages.Success.*`
@@ -38,7 +50,7 @@
 
 
 
-**Файл**: `src/Blog/Services/Models/EntityName.cs`
+**Файл**: `src/ProjectName/Services/Models/EntityName.cs`
 
 ```csharp
 using Services.Models.QueryPipeline;
@@ -181,7 +193,7 @@ public class EntityNameRelatedEntityDropdownItem
 
 Нужно добавить в `Services/QueryPipeline` сущностно-специфичные классы:
 
-**Файл**: `src/Blog/Services/QueryPipeline/EntityNameFieldSelectors.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/EntityNameFieldSelectors.cs`
 
 ```csharp
 using Datasource.Ef.Models;
@@ -222,7 +234,7 @@ public class EntityNameFieldSelectors : IEntityFieldSelectors<EntityName>
 }
 ```
 
-**Файл**: `src/Blog/Services/QueryPipeline/EntityNameFieldMap.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/EntityNameFieldMap.cs`
 
 ```csharp
 namespace Services.QueryPipeline;
@@ -262,7 +274,7 @@ public class EntityNameFieldMapAdapter : IQueryPipelineFieldMap
 }
 ```
 
-**Файл**: `src/Blog/Services/QueryPipeline/EntityNameQueryPipelineValidator.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/EntityNameQueryPipelineValidator.cs`
 
 ```csharp
 namespace Services.QueryPipeline;
@@ -285,7 +297,7 @@ public class EntityNameQueryPipelineValidator : QueryPipelineValidator, IEntityN
 
 Минимальные правки:
 
-**Файл**: `src/Blog/Services/QueryPipeline/QueryPipelineOperators.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/QueryPipelineOperators.cs`
 
 ```csharp
 public static readonly IReadOnlySet<string> FilterOperators = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -310,7 +322,7 @@ public static readonly IReadOnlySet<string> FilterOperators = new HashSet<string
 };
 ```
 
-**Файл**: `src/Blog/Services/QueryPipeline/FilterParametersBuilder.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/FilterParametersBuilder.cs`
 
 ```csharp
 case FieldType.Boolean:
@@ -398,7 +410,7 @@ private static bool TryGetBool(object? value, out bool result)
 
 ### 6.3 Создание класса с текстами
 
-**Файл**: `src/Blog/Services/Texts/EntityNameTexts.cs`
+**Файл**: `src/ProjectName/Services/Texts/EntityNameTexts.cs`
 
 ```csharp
 namespace Services.Texts;
@@ -407,6 +419,15 @@ public static class EntityNameTexts
 {
     public static class Messages
     {
+        public static class Validation
+        {
+            public const string RequestNull = "Request не должен быть null";
+            public const string IdNotValid = "Id должен быть больше 0";
+            public const string NameEmpty = "Name не должен быть пустым";
+            public const string RelatedEntityIdsNotValid = "Список идентификаторов связанных сущностей содержит недопустимые значения";
+            public const string PaginationNotValid = "Параметры пагинации заданы некорректно";
+        }
+
         public static class Start
         {
             public const string DisplayCreating = "Начало загрузки данных для создания EntityName";
@@ -460,7 +481,7 @@ public static class EntityNameTexts
 
 ### 6.4 Создание интерфейса сервиса
 
-**Файл**: `src/Blog/Services/Api/ServiceEntityName.cs`
+**Файл**: `src/ProjectName/Services/Api/ServiceEntityName.cs`
 
 ```csharp
 using System.Threading;
@@ -545,13 +566,29 @@ public class ServiceEntityName : IServiceEntityName
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.Creating);
 
+        if (request == null)
+        {
+            throw new BadRequestException(EntityNameTexts.Messages.Validation.RequestNull);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            throw new BadRequestException(EntityNameTexts.Messages.Validation.NameEmpty);
+        }
+
+        var relatedEntityIds = request.RelatedEntityDropdownSelectedIds ?? [];
+        if (relatedEntityIds.Any(p => p <= 0))
+        {
+            throw new BadRequestException(EntityNameTexts.Messages.Validation.RelatedEntityIdsNotValid);
+        }
+
         var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
             var model = unitOfWork.EntityNames.GetNew();
             model.Name = request.Name;
 
-            var entityNameCommandOptions = new EntityNameCommandOptions { RelatedEntityIds = request.RelatedEntityDropdownSelectedIds };
+            var entityNameCommandOptions = new EntityNameCommandOptions { RelatedEntityIds = relatedEntityIds };
 
             var response = unitOfWork.EntityNames.Create(model, entityNameCommandOptions);
 
@@ -576,6 +613,16 @@ public class ServiceEntityName : IServiceEntityName
 
         try
         {
+            if (request == null)
+            {
+                throw new BadRequestException(EntityNameTexts.Messages.Validation.RequestNull);
+            }
+
+            if (request.Id <= 0)
+            {
+                throw new BadRequestException(EntityNameTexts.Messages.Validation.IdNotValid);
+            }
+
             var entityNameQueryOptions = new EntityNameQueryOptions { IncludeRelatedEntities = true };
             var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, entityNameQueryOptions, cancellationToken);
 
@@ -613,6 +660,27 @@ public class ServiceEntityName : IServiceEntityName
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.Updating);
 
+        if (request == null)
+        {
+            throw new BadRequestException(EntityNameTexts.Messages.Validation.RequestNull);
+        }
+
+        if (request.Id <= 0)
+        {
+            throw new BadRequestException(EntityNameTexts.Messages.Validation.IdNotValid);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            throw new BadRequestException(EntityNameTexts.Messages.Validation.NameEmpty);
+        }
+
+        var relatedEntityIds = request.RelatedEntityDropdownSelectedIds ?? [];
+        if (relatedEntityIds.Any(p => p <= 0))
+        {
+            throw new BadRequestException(EntityNameTexts.Messages.Validation.RelatedEntityIdsNotValid);
+        }
+
         var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
@@ -623,7 +691,7 @@ public class ServiceEntityName : IServiceEntityName
 
             model.Name = request.Name;
 
-            var entityNameCommandOptions = new EntityNameCommandOptions { RelatedEntityIds = request.RelatedEntityDropdownSelectedIds };
+            var entityNameCommandOptions = new EntityNameCommandOptions { RelatedEntityIds = relatedEntityIds };
             
             var response = unitOfWork.EntityNames.Update(model, entityNameCommandOptions);
 
@@ -648,6 +716,16 @@ public class ServiceEntityName : IServiceEntityName
 
         try
         {
+            if (request == null)
+            {
+                throw new BadRequestException(EntityNameTexts.Messages.Validation.RequestNull);
+            }
+
+            if (request.Id <= 0)
+            {
+                throw new BadRequestException(EntityNameTexts.Messages.Validation.IdNotValid);
+            }
+
             var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, cancellationToken: cancellationToken);
 
             if (model == default)
@@ -673,6 +751,16 @@ public class ServiceEntityName : IServiceEntityName
     public async Task<EntityNameDeleteResponse> DeleteAsync(EntityNameDeleteRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation(EntityNameTexts.Messages.Start.Deleting);
+
+        if (request == null)
+        {
+            throw new BadRequestException(EntityNameTexts.Messages.Validation.RequestNull);
+        }
+
+        if (request.Id <= 0)
+        {
+            throw new BadRequestException(EntityNameTexts.Messages.Validation.IdNotValid);
+        }
 
         var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         try
@@ -707,6 +795,16 @@ public class ServiceEntityName : IServiceEntityName
 
         try
         {
+            if (request == null)
+            {
+                throw new BadRequestException(EntityNameTexts.Messages.Validation.RequestNull);
+            }
+
+            if (request.Id <= 0)
+            {
+                throw new BadRequestException(EntityNameTexts.Messages.Validation.IdNotValid);
+            }
+
             var entityNameQueryOptions = new EntityNameQueryOptions { IncludeRelatedEntities = true };
             var model = await unitOfWork.EntityNames.GetSingleOrDefaultAsync(request.Id, entityNameQueryOptions, cancellationToken);
 
@@ -744,6 +842,21 @@ public class ServiceEntityName : IServiceEntityName
 
         try
         {
+            if (request == null)
+            {
+                throw new BadRequestException(EntityNameTexts.Messages.Validation.RequestNull);
+            }
+
+            if (request.PaginationField?.Skip != null && request.PaginationField.Skip < 0)
+            {
+                throw new BadRequestException(EntityNameTexts.Messages.Validation.PaginationNotValid);
+            }
+
+            if (request.PaginationField?.Take != null && (request.PaginationField.Take < 0 || request.PaginationField.Take > 200))
+            {
+                throw new BadRequestException(EntityNameTexts.Messages.Validation.PaginationNotValid);
+            }
+
             queryPipelineValidator.Validate(request.SearchFields, request.FilterFields, request.OrderFields);
 
             var searchParameters = SearchParametersBuilder<EntityName>.Build(request.SearchFields, fieldSelectors);
@@ -830,7 +943,7 @@ public class ServiceEntityName : IServiceEntityName
 
 ### 6.6 Добавление регистрации сервисов
 
-**Файл**: `src/Blog/Client/Middleware/ServiceRegistration.cs`
+**Файл**: `src/ProjectName/Client/Middleware/ServiceRegistration.cs`
 
 Добавить в метод `AddDependencyInjectionExt`:
 

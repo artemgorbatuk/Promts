@@ -4,13 +4,14 @@
 
 - Цель: реализовать HTTP API для сущности `EntityName` поверх сервисного слоя `IServiceEntityName`
 - Использовать ASP.NET Core Web API (Controllers) на актуальной версии .NET и C# (net8.0+), `nullable` включен
-- Контроллер размещать в слое представления (например, `src/Blog/Client/Controllers/`)
+- Контроллер размещать в слое представления (например, `src/ProjectName/Client/Controllers/`)
 - Контроллер должен быть помечен `[ApiController]`
 - Роуты должны быть стабильными и человекочитаемыми, в kebab-case: базовый префикс `api/entity-names`
 - Все операции должны принимать `CancellationToken cancellationToken`
 - Все операции должны вызывать только сервисы и не обращаться к `DbContext`/репозиториям напрямую
 - Порядок и группировка action-методов в контроллере должны соответствовать интерфейсу сервиса: DisplayCreate/Create, DisplayUpdate/Update, DisplayDelete/Delete, DisplayInfo, DisplayList, DisplayRelatedEntityDropdownItems
 - Не логировать входные модели целиком и не писать в логи чувствительные данные
+- Контроллеры не перехватывают доменные исключения (`BadRequest/NotFound/Conflict/Unauthorized` и т.п.) из сервисов — глобальный обработчик исключений Web-слоя маппит их в HTTP-ответы
 - Для стандартных CRUD-операций использовать HTTP-методы и коды ответов:
   - `GET` возвращает `200 OK`
   - `POST` возвращает `200 OK`; `201 Created` использовать только если контракт создания возвращает идентификатор созданной сущности и контроллер может вернуть корректный Location
@@ -30,7 +31,7 @@
 
 ### Создание контроллера
 
-**Файл**: `src/Blog/Client/Controllers/EntityNamesController.cs`
+**Файл**: `src/ProjectName/Client/Controllers/EntityNamesController.cs`
 
 ```csharp
 using Microsoft.AspNetCore.Authorization;
@@ -145,3 +146,16 @@ public class EntityNamesController : ControllerBase
 builder.Services.AddControllers();
 app.MapControllers();
 ```
+
+### Глобальный обработчик исключений (обязательно)
+
+- Если проект использует `IExceptionHandler` для глобальной обработки, зарегистрировать обработчик и включить его в HTTP pipeline.
+- Для корректного маппинга исключений сервисного слоя в HTTP-ответы обработчик должен активироваться через `app.UseExceptionHandler();` без path-редиректа.
+
+```csharp
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+var app = builder.Build();
+app.UseExceptionHandler();
+```
+
+- Если проект выбрал иной формат ошибок (не ProblemDetails), привести `ProducesErrorResponseType` и Swagger-конвенции к единому формату по всему API.
