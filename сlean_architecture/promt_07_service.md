@@ -74,6 +74,7 @@ public class EntityNameDisplayCreateResponse
 
 public class EntityNameCreateResponse
 {
+	public required int Id { get; set; }
 }
 
 // === UPDATE ===
@@ -101,6 +102,7 @@ public class EntityNameUpdateRequest
 
 public class EntityNameUpdateResponse
 {
+	public required int Id { get; set; }
 }
 
 // === DELETE ===
@@ -590,10 +592,12 @@ public class ServiceEntityName : IServiceEntityName
 
             var entityNameCommandOptions = new EntityNameCommandOptions { RelatedEntityIds = relatedEntityIds };
 
-            var response = unitOfWork.EntityNames.Create(model, entityNameCommandOptions);
+            unitOfWork.EntityNames.Create(model, entityNameCommandOptions);
 
              await unitOfWork.SaveChangesAsync(cancellationToken);
              await unitOfWork.CommitTransactionAsync(transaction, cancellationToken);
+
+            var response = new EntityNameCreateResponse { Id = model.Id };
 
             logger.LogInformation(EntityNameTexts.Messages.Success.CreateCompleted);
 

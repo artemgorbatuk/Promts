@@ -228,7 +228,7 @@ public class SearchParameters<TModel> where TModel : class
         var leftBody = new ReplaceParameterVisitor(left.Parameters[0], parameter).Visit(left.Body);
         var rightBody = new ReplaceParameterVisitor(right.Parameters[0], parameter).Visit(right.Body);
 
-        var body = Expression.AndAlso(leftBody!, rightBody!);
+        var body = Expression.OrElse(leftBody!, rightBody!);
 
         return Expression.Lambda<Func<TModel, bool>>(body, parameter);
     }

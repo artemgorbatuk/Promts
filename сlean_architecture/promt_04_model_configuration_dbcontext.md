@@ -43,24 +43,40 @@ namespace Datasource.Ef.Models;
 
 public class EntityName
 {
-    // Первичный ключ
     public int Id { get; set; }
-    
-    // Другие поля из требований
-    public string Name { get; set; }
-       
-    // Foreign Key + навигация (многие-к-одному)
+    public string Name { get; set; } = string.Empty;
 
-    // Обязательная связь
+    public virtual ICollection<RelatedEntity> RelatedEntities { get; set; } = [];
+}
+```
+
+Пример многие-к-одному (обязательная связь):
+
+```csharp
+namespace Datasource.Ef.Models;
+
+public class EntityName
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+
     public int EntityId { get; set; }
     public virtual Entity Entity { get; set; } = default!;
-    
-    // Необязательная связь
+}
+```
+
+Пример многие-к-одному (необязательная связь):
+
+```csharp
+namespace Datasource.Ef.Models;
+
+public class EntityName
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+
     public int? EntityId { get; set; }
     public virtual Entity? Entity { get; set; }
-
-    // Навигационные свойства коллекций (один-ко-многим)
-    public virtual ICollection<RelatedEntity> RelatedEntities { get; set; } = [];
 }
 ```
 
