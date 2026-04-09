@@ -2,7 +2,7 @@
 
 Эти классы реализуются **один раз на проект** в `Repositories.Ef/QueryPipeline` и используются всеми репозиториями через `*QueryOptions`.
 
-**Файл**: `src/Blog/Repositories.Ef/QueryPipeline/PaginationParameters.cs`
+**Файл**: `src/ProjectName/Repositories.Ef/QueryPipeline/PaginationParameters.cs`
 
 ```csharp
 namespace Repositories.Ef.QueryPipeline;
@@ -35,7 +35,7 @@ public class PaginationParameters
 }
 ```
 
-**Файл**: `src/Blog/Repositories.Ef/QueryPipeline/OrderParameters.cs`
+**Файл**: `src/ProjectName/Repositories.Ef/QueryPipeline/OrderParameters.cs`
 
 ```csharp
 using System.Linq.Expressions;
@@ -95,7 +95,7 @@ public class OrderParameters<TModel> where TModel : class
 }
 ```
 
-**Файл**: `src/Blog/Repositories.Ef/QueryPipeline/FilterParameters.cs`
+**Файл**: `src/ProjectName/Repositories.Ef/QueryPipeline/FilterParameters.cs`
 
 ```csharp
 using System.Linq.Expressions;
@@ -184,7 +184,7 @@ public class FilterParameters<TModel> where TModel : class
 }
 ```
 
-**Файл**: `src/Blog/Repositories.Ef/QueryPipeline/SearchParameters.cs`
+**Файл**: `src/ProjectName/Repositories.Ef/QueryPipeline/SearchParameters.cs`
 
 ```csharp
 using System.Linq.Expressions;

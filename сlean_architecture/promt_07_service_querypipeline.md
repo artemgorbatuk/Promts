@@ -4,9 +4,9 @@
 
 ## DTO-модели QueryPipeline
 
-**Папка**: `src/Blog/Services/Models/QueryPipeline/`
+**Папка**: `src/ProjectName/Services/Models/QueryPipeline/`
 
-**Файл**: `src/Blog/Services/Models/QueryPipeline/SearchField.cs`
+**Файл**: `src/ProjectName/Services/Models/QueryPipeline/SearchField.cs`
 
 ```csharp
 namespace Services.Models.QueryPipeline;
@@ -17,7 +17,7 @@ public record SearchField(
     string Operator);
 ```
 
-**Файл**: `src/Blog/Services/Models/QueryPipeline/FilterField.cs`
+**Файл**: `src/ProjectName/Services/Models/QueryPipeline/FilterField.cs`
 
 ```csharp
 namespace Services.Models.QueryPipeline;
@@ -30,7 +30,7 @@ public record FilterField(
     bool? IgnoreCase);
 ```
 
-**Файл**: `src/Blog/Services/Models/QueryPipeline/OrderField.cs`
+**Файл**: `src/ProjectName/Services/Models/QueryPipeline/OrderField.cs`
 
 ```csharp
 namespace Services.Models.QueryPipeline;
@@ -41,7 +41,7 @@ public record OrderField(
     bool AfterTake);
 ```
 
-**Файл**: `src/Blog/Services/Models/QueryPipeline/PaginationField.cs`
+**Файл**: `src/ProjectName/Services/Models/QueryPipeline/PaginationField.cs`
 
 ```csharp
 namespace Services.Models.QueryPipeline;
@@ -53,9 +53,9 @@ public record PaginationField(
 
 ## Сервисный слой QueryPipeline (валидация и билдеры)
 
-**Папка**: `src/Blog/Services/QueryPipeline/`
+**Папка**: `src/ProjectName/Services/QueryPipeline/`
 
-**Файл**: `src/Blog/Services/QueryPipeline/QueryPipelineOperators.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/QueryPipelineOperators.cs`
 
 ```csharp
 namespace Services.QueryPipeline;
@@ -100,7 +100,7 @@ public static class QueryPipelineOperators
 }
 ```
 
-**Файл**: `src/Blog/Services/QueryPipeline/IEntityFieldSelectors.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/IEntityFieldSelectors.cs`
 
 ```csharp
 using System.Linq.Expressions;
@@ -124,7 +124,7 @@ public interface IEntityFieldSelectors<TEntity>
 }
 ```
 
-**Файл**: `src/Blog/Services/QueryPipeline/IQueryPipelineFieldMap.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/IQueryPipelineFieldMap.cs`
 
 ```csharp
 namespace Services.QueryPipeline;
@@ -140,7 +140,7 @@ public interface IQueryPipelineFieldMap
 }
 ```
 
-**Файл**: `src/Blog/Services/QueryPipeline/IQueryPipelineValidator.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/IQueryPipelineValidator.cs`
 
 ```csharp
 using Services.Models.QueryPipeline;
@@ -160,7 +160,7 @@ public interface IQueryPipelineValidator
 }
 ```
 
-**Файл**: `src/Blog/Services/QueryPipeline/QueryPipelineValidator.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/QueryPipelineValidator.cs`
 
 ```csharp
 using Services.Exceptions;
@@ -273,7 +273,7 @@ public class QueryPipelineValidator : IQueryPipelineValidator
 }
 ```
 
-**Файл**: `src/Blog/Services/QueryPipeline/PaginationParametersBuilder.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/PaginationParametersBuilder.cs`
 
 ```csharp
 using Repositories.Ef.QueryPipeline;
@@ -295,17 +295,17 @@ public static class PaginationParametersBuilder
 }
 ```
 
-**Файл**: `src/Blog/Services/QueryPipeline/SearchParametersBuilder.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/SearchParametersBuilder.cs`
 
 Перенести “как есть” из FlightChat:  
 `FlightChatApp/Services/QueryPipeline/SearchParametersBuilder.cs`
 
-**Файл**: `src/Blog/Services/QueryPipeline/OrderParametersBuilder.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/OrderParametersBuilder.cs`
 
 Перенести “как есть” из FlightChat:  
 `FlightChatApp/Services/QueryPipeline/OrderParametersBuilder.cs`
 
-**Файл**: `src/Blog/Services/QueryPipeline/FilterParametersBuilder.cs`
+**Файл**: `src/ProjectName/Services/QueryPipeline/FilterParametersBuilder.cs`
 
 Перенести “как есть” из FlightChat:  
 `FlightChatApp/Services/QueryPipeline/FilterParametersBuilder.cs`  

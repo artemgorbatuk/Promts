@@ -6,7 +6,7 @@
 #### Общие требования для всех типов связей:
 - Название классов опций: `EntityNameQueryOptions` и `EntityNameCommandOptions` (если нужны)
 - Интерфейс и реализация репозитория должны находиться в одном файле
-- Репозиторий получает `DbContextBlog` через DI (Scoped)
+- Репозиторий получает `DbContextProjectName` через DI (Scoped)
 - Для каждой Entity/модели, с которой работает сервисный слой, должен быть создан репозиторий (интерфейс + реализация), а также соответствующее свойство в `IUnitOfWork` (только если оно реально используется сервисами)
 - Репозитории НЕ вызывают `SaveChanges/SaveChangesAsync` и НЕ управляют транзакциями
 - Коммит выполняется через `IUnitOfWork.SaveChanges/SaveChangesAsync` на уровне сервисов
@@ -66,7 +66,7 @@
 
 ### Создание класса опций
 
-**Файл**: `src/Blog/Repositories.Ef/Options/EntityNameOptions.cs`
+**Файл**: `src/ProjectName/Repositories.Ef/Options/EntityNameOptions.cs`
 
 ```csharp
 using Repositories.Ef.QueryPipeline;
@@ -95,7 +95,7 @@ public class EntityNameCommandOptions
 
 ### Создание интерфейса и реализации репозитория (в одном файле)
 
-**Файл**: `src/Blog/Repositories.Ef/Api/RepositoryEntityName.cs`
+**Файл**: `src/ProjectName/Repositories.Ef/Api/RepositoryEntityName.cs`
 
 ```csharp
 using Datasource.Ef.Contexts;
@@ -121,9 +121,9 @@ public interface IRepositoryEntityName
 
 public class RepositoryEntityName : IRepositoryEntityName
 {
-    private readonly DbContextBlog context;
+    private readonly DbContextProjectName context;
 
-    public RepositoryEntityName(DbContextBlog context)
+    public RepositoryEntityName(DbContextProjectName context)
     {
         this.context = context;
     }
@@ -240,7 +240,7 @@ public class RepositoryEntityName : IRepositoryEntityName
 
 ### Unit Of Work
 
-**Файл**: `src/Blog/Repositories.Ef/Api/UnitOfWork.cs`
+**Файл**: `src/ProjectName/Repositories.Ef/Api/UnitOfWork.cs`
 
 ```csharp
 using Microsoft.EntityFrameworkCore.Storage;
@@ -291,7 +291,7 @@ catch
 
 ### Добавление регистрации сервисов
 
-**Файл**: `src/Blog/Client/Middleware/ServiceRegistration.cs`
+**Файл**: `src/ProjectName/Client/Middleware/ServiceRegistration.cs`
 
 Добавить в метод `AddDependencyInjectionExt` (при необходимости добавить `using Datasource.Ef.Models;` и `using Services.QueryPipeline;`):
 

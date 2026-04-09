@@ -27,7 +27,7 @@
 - Связи многие-ко-многим с промежуточной таблицей, только в конфигурации левой таблицы.
 - Настройка поведения при удалении (Restrict/SetNull/Cascade)
 
-#### Контекст (DbContextBlog.cs)
+#### Контекст (DbContextProjectName.cs)
 - DbSet свойства во множественном числе
 - Добавление в алфавитном порядке среди других DbSet
 - Конфигурации подключаются автоматически через ApplyConfigurationsFromAssembly()
@@ -36,7 +36,7 @@
 
 #### Файл
 
-`src/Blog/Datasource.Ef/Models/EntityName.cs`
+`src/ProjectName/Datasource.Ef/Models/EntityName.cs`
 
 ```csharp
 namespace Datasource.Ef.Models;
@@ -70,7 +70,7 @@ public class EntityName
 
 #### Файл
 
-`src/Blog/Datasource.Ef/Configurations/ConfigurationEntityName.cs`
+`src/ProjectName/Datasource.Ef/Configurations/ConfigurationEntityName.cs`
 
 ```csharp
 using Datasource.Ef.Models;
@@ -185,9 +185,9 @@ public class ConfigurationEntityName : IEntityTypeConfiguration<EntityName>
 
 #### Файл
 
-`src/Blog/Datasource.Ef/Contexts/DbContextBlog.cs`
+`src/ProjectName/Datasource.Ef/Contexts/DbContextProjectName.cs`
 
-Добавить свойство DbSet в класс `DbContextBlog`:
+Добавить свойство DbSet в класс `DbContextProjectName`:
 
 ```csharp
 public virtual DbSet<EntityName> EntityNames { get; set; }
